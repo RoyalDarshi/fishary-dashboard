@@ -1,0 +1,19 @@
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.map-wrapper {
+  width: 100%;
+  height: 100%; /* This makes it fill the screen */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.map-container {
+  width: 100vw;     /* Responsive width */
+  height: 100vh;    /* Fixed height relative to viewport */
+  background: #fff;
+}

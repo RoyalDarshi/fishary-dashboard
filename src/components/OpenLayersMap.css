@@ -1,0 +1,14 @@
+.ol-control {
+  bottom: 10px !important;
+  right: 10px !important;
+  top: auto !important;
+  left: auto !important;
+}
+
+.custom-zoom {
+  position: absolute !important;
+  bottom: 12px !important;
+  right: 12px !important;
+  top: auto !important;
+  left: auto !important;
+}
