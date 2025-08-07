@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { MapPin, Users, IndianRupee, TrendingUp } from "lucide-react";
+import { MapPin, Users, IndianRupee, TrendingUp, Fish } from "lucide-react";
 import OpenLayersMap from "./components/OpenLayerMap";
 import AreaDetailsPopup from "./components/AreaDetailsPopup";
 import FiltersAndKPIs from "./components/FiltersAndKPIs";
@@ -11,20 +11,24 @@ import {
 } from "./components/Charts";
 import pmmsyData from "./data/pmmsyData.json";
 
-// Interface for generic metric values
+// Interface for metric values
 interface MetricValues {
-  beneficiaries: number;
-  funds: number;
-  registrations: number;
+  beneficiaries?: number;
+  funds?: number;
+  registrations?: number;
+  totalProjects?: number;
+  totalInvestment?: number;
+  fishOutput?: number;
   funds_used?: number;
   beneficiaries_last_24h?: number;
   registrations_last_24h?: number;
 }
 
-// Type definitions for scheme, gender, and year filters
+// Type definitions for scheme, gender, year, and PMMSY metric filters
 export type SchemeKey = "all" | "PMMKSS" | "PMMSY" | "KCC" | "NFDP";
 export type GenderKey = "all" | "male" | "female" | "transgender";
 export type YearKey = "all" | "2021" | "2022" | "2023" | "2024";
+export type PMMSYMetricKey = "totalProjects" | "totalInvestment" | "fishOutput";
 
 // Interface for area-specific metric data
 interface AreaMetricData {
@@ -49,39 +53,7 @@ interface GeoJSONData {
   features: GeoJSONFeature[];
 }
 
-// Interface for raw PMMSY data entries
-interface PMMSYRawEntry {
-  UNIQUE_ID: string;
-  "NAME_OF_THE_STATE/UT": string;
-  "FISHERIES_SECTOR_OF_THE_STATE/UT": string;
-  FINANCIAL_YEAR: string;
-  COMPONENT: string;
-  NAME_OF_THE_ACTIVITY: string;
-  "NAME_OF_THE_SUB-ACTIVITY": string;
-  PMMSY_UNIT_COST: number;
-  TYPE_OF_BENEFICIARY: string;
-  "NAME_OF_THE_BENEFICIARY_/_GROUP_LEADER_/_ENTERPRISE_(OR)_COMPANY_AUTHORISED": string;
-  BENEFICIARY_PHOTO: string;
-  "FATHER’S_(OR)_HUSBAND’S_NAME": string;
-  BENEFICIARY_DISTRICT: string;
-  "BENEFICIARY_TALUK_/_MANDAL": string;
-  BENEFICIARY_VILLAGE: string;
-  PIN_CODE: number;
-  "ADDRESS_OF_THE_BENEFICIARY_/_GROUP_LEADER_/_ENTREPRENEUR_/_ENTERPRISE_FIRM": string;
-  "SUM_OF_TOTAL_COST_(CENTRAL_SHARE+_STATE_SHARE+_BENEFICIARY_CONTRIBUTION)": number;
-  "SUM_OF_ADDITIONAL_STATE_SHARE_RELEASED_(IN_RS.)"?: number;
-  OUTPUT?: string;
-  TOTAL_OUTPUT?: string;
-  "TOTAL_EMPLOYMENT_GENERATED_(WOMEN)"?: string;
-  "TOTAL_EMPLOYMENT_GENERATED_(MEN)"?: string;
-  "DIRECT_EMPLOYMENT_GENERATED_(WOMEN)"?: string;
-  "DIRECT_EMPLOYMENT_GENERATED_(MEN)"?: string;
-  "INDIRECT_EMPLOYMENT_GENERATED_(WOMEN)"?: string;
-  "INDIRECT_EMPLOYMENT_GENERATED_(MEN)"?: string;
-  GENDER?: string;
-}
-
-// Interface for aggregated PMMSY data
+// Interface for aggregated PMMSY data (for charts)
 export interface PMMSYAggregatedData {
   totalProjects: number;
   totalInvestment: number;
@@ -95,13 +67,13 @@ export interface PMMSYAggregatedData {
   sectorDistribution: { name: string; value: number }[];
 }
 
-// Display names for filters
+// Display name mappings
 const schemeDisplayNames: Record<SchemeKey, string> = {
   all: "All Schemes",
-  PMMKSS: "Pradhan Mantri Matsya Kisaan Samridhi Sah-Yojana",
-  PMMSY: "Pradhan Mantri Matsya Sampada Yojana",
-  KCC: "Kishan Credit Card",
-  NFDP: "National Fisheries Digital Platform",
+  PMMKSS: "PMMKSS",
+  PMMSY: "PMMSY",
+  KCC: "KCC",
+  NFDP: "NFDP",
 };
 
 const genderDisplayNames: Record<GenderKey, string> = {
@@ -123,7 +95,7 @@ const App: React.FC = () => {
   // State variables
   const [polygonData, setPolygonData] = useState<GeoJSONData | null>(null);
   const [metricData, setMetricData] = useState<Record<string, AreaMetricData> | null>(null);
-  const [selectedMetric, setSelectedMetric] = useState<"beneficiaries" | "funds" | "registrations">("beneficiaries");
+  const [selectedMetric, setSelectedMetric] = useState<"beneficiaries" | "funds" | "registrations" | PMMSYMetricKey>("beneficiaries");
   const [selectedScheme, setSelectedScheme] = useState<SchemeKey>("all");
   const [selectedGender, setSelectedGender] = useState<GenderKey>("all");
   const [selectedYear, setSelectedYear] = useState<YearKey>("all");
@@ -143,11 +115,10 @@ const App: React.FC = () => {
     projectsByStateUT: [],
     sectorDistribution: [],
   });
-  const [pmmsyAreaSpecificMetrics, setPmmsyAreaSpecificMetrics] = useState<Record<string, PMMSYAggregatedData>>({});
   const [selectedSectorPMMSY, setSelectedSectorPMMSY] = useState<string>("all");
   const [selectedActivityPMMSY, setSelectedActivityPMMSY] = useState<string>("all");
   const [selectedFinancialYearPMMSY, setSelectedFinancialYearPMMSY] = useState<string>("all");
-  const [mockPMMSYData, setMockPMMSYData] = useState<PMMSYRawEntry[]>([]);
+  const [mockPMMSYData, setMockPMMSYData] = useState<Record<string, AreaMetricData> | null>(null);
   const [mockNonPMMSYData, setMockNonPMMSYData] = useState<Record<string, AreaMetricData> | null>(null);
 
   // Memoized officer names
@@ -173,28 +144,10 @@ const App: React.FC = () => {
     return officerMap;
   }, [polygonData]);
 
-  // Pre-compute shapeIdMap for PMMSY aggregation
-  const shapeIdMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    if (polygonData) {
-      polygonData.features.forEach((feature) => {
-        const { state_name, district_name, subdistrict_name, level, shapeID } = feature.properties;
-        if (level === "sub-district" && state_name && district_name && subdistrict_name) {
-          map[`${state_name}_${district_name}_${subdistrict_name}`] = shapeID;
-        } else if (level === "district" && state_name && district_name) {
-          map[`${state_name}_${district_name}`] = shapeID;
-        } else if (level === "state" && state_name) {
-          map[state_name] = shapeID;
-        }
-      });
-    }
-    return map;
-  }, [polygonData]);
-
   // Generate mock data for schemes other than PMMSY
   const generateMockData = (areas: GeoJSONFeature[]): Record<string, AreaMetricData> => {
     const dataMap: Record<string, AreaMetricData> = {};
-    const schemes: SchemeKey[] = ["all", "PMMKSS", "PMMSY", "KCC", "NFDP"];
+    const schemes: SchemeKey[] = ["all", "PMMKSS", "KCC", "NFDP"];
     const genders: GenderKey[] = ["all", "male", "female", "transgender"];
     const years: YearKey[] = ["all", "2021", "2022", "2023", "2024"];
 
@@ -257,113 +210,96 @@ const App: React.FC = () => {
     return dataMap;
   };
 
-  // Optimized PMMSY data generation
-  const generateMockPMMSYData = useCallback((features: GeoJSONFeature[]): PMMSYRawEntry[] => {
-    const sectors = ["Inland", "Marine"];
+  // Generate mock PMMSY data, aligned with other schemes
+  const generateMockPMMSYData = useCallback((areas: GeoJSONFeature[]): Record<string, AreaMetricData> => {
+    const dataMap: Record<string, AreaMetricData> = {};
+    const genders: GenderKey[] = ["all", "male", "female", "transgender"];
+    const years: YearKey[] = ["all", "2021", "2022", "2023", "2024"];
+    const sectors = ["all", "Inland", "Marine"];
     const activities = [
+      "all",
       "Infrastructure and Post-harvest Management",
       "Fisheries Management and Regulatory Framework",
       "Enhancement of Production and Productivity",
     ];
-    const years = ["2021-22", "2022-23", "2023-24"];
-    const genders = ["male", "female", "transgender"];
-    const names = ["Ram", "Sita", "Mohan", "Rita", "Amit"];
-    const entries: PMMSYRawEntry[] = [];
 
-    // Limit the number of entries to a reasonable size to prevent performance issues
-    const entryCount = Math.min(features.length * 2, 1000); // Generate up to 2 entries per feature, capped at 1000
-    const featureCount = features.length;
+    areas.forEach((area) => {
+      const areaId = area.properties.shapeID;
+      const areaData: AreaMetricData = {};
+      const regionalBias = area.properties.level === "state" ? 1.0 + Math.random() * 0.1 : 0.9 + Math.random() * 0.2;
 
-    for (let i = 0; i < entryCount; i++) {
-      const feature = features[i % featureCount]; // Distribute entries across features
-      const state = feature.properties.state_name || "Uttarakhand";
-      const district = feature.properties.district_name || "Dehradun";
-      const subdistrict = feature.properties.subdistrict_name || "Raipur";
-      const sector = sectors[Math.floor(Math.random() * sectors.length)];
-      const activity = activities[Math.floor(Math.random() * activities.length)];
-      const year = years[Math.floor(Math.random() * years.length)];
-      const gender = genders[Math.floor(Math.random() * genders.length)];
-      const name = names[Math.floor(Math.random() * names.length)];
+      genders.forEach((gender) => {
+        years.forEach((year) => {
+          sectors.forEach((sector) => {
+            activities.forEach((activity) => {
+              const key = `PMMSY_${gender}_${year}_${sector}_${activity}`;
+              const genderMod = gender === "all" ? 1 : gender === "male" ? 1.2 : gender === "female" ? 0.9 : 0.8;
+              const yearMod = year === "all" ? 1 : year === "2021" ? 0.8 : year === "2022" ? 0.9 : year === "2023" ? 1.0 : 1.1;
+              const sectorMod = sector === "all" ? 1 : sector === "Inland" ? 1.1 : 0.9;
+              const activityMod = activity === "all" ? 1 : 0.95 + Math.random() * 0.1;
+              const weight = genderMod * yearMod * sectorMod * activityMod * regionalBias;
 
-      const cost = Math.floor(100000 + Math.random() * 1000000);
-      const output = (Math.random() * 50).toFixed(2);
-      const empWomen = Math.floor(Math.random() * 10);
-      const empMen = Math.floor(Math.random() * 15);
+              const totalProjects = Math.floor(weight * (10 + Math.random() * 90));
+              const totalInvestment = Math.floor(weight * (500000 + Math.random() * 4500000));
+              const fishOutput = Math.floor(weight * (20 + Math.random() * 180));
 
-      entries.push({
-        UNIQUE_ID: `${i}-${Date.now()}`,
-        "NAME_OF_THE_STATE/UT": state,
-        "FISHERIES_SECTOR_OF_THE_STATE/UT": sector,
-        FINANCIAL_YEAR: year,
-        COMPONENT: "Infrastructure",
-        NAME_OF_THE_ACTIVITY: activity,
-        "NAME_OF_THE_SUB-ACTIVITY": "Sub-Infra",
-        PMMSY_UNIT_COST: cost,
-        TYPE_OF_BENEFICIARY: "Individual",
-        "NAME_OF_THE_BENEFICIARY_/_GROUP_LEADER_/_ENTERPRISE_(OR)_COMPANY_AUTHORISED": name,
-        BENEFICIARY_PHOTO: "",
-        "FATHER’S_(OR)_HUSBAND’S_NAME": "Sharma",
-        BENEFICIARY_DISTRICT: district,
-        "BENEFICIARY_TALUK_/_MANDAL": subdistrict,
-        BENEFICIARY_VILLAGE: "Test Village",
-        PIN_CODE: 123456,
-        "ADDRESS_OF_THE_BENEFICIARY_/_GROUP_LEADER_/_ENTREPRENEUR_/_ENTERPRISE_FIRM": "Test Address",
-        "SUM_OF_TOTAL_COST_(CENTRAL_SHARE+_STATE_SHARE+_BENEFICIARY_CONTRIBUTION)": cost,
-        "SUM_OF_ADDITIONAL_STATE_SHARE_RELEASED_(IN_RS.)": Math.floor(cost * 0.1),
-        OUTPUT: output,
-        TOTAL_OUTPUT: output,
-        "TOTAL_EMPLOYMENT_GENERATED_(WOMEN)": empWomen.toString(),
-        "TOTAL_EMPLOYMENT_GENERATED_(MEN)": empMen.toString(),
-        "DIRECT_EMPLOYMENT_GENERATED_(WOMEN)": Math.floor(empWomen * 0.6).toString(),
-        "DIRECT_EMPLOYMENT_GENERATED_(MEN)": Math.floor(empMen * 0.6).toString(),
-        "INDIRECT_EMPLOYMENT_GENERATED_(WOMEN)": Math.floor(empWomen * 0.4).toString(),
-        "INDIRECT_EMPLOYMENT_GENERATED_(MEN)": Math.floor(empMen * 0.4).toString(),
-        GENDER: gender,
+              areaData[key] = {
+                totalProjects,
+                totalInvestment,
+                fishOutput,
+              };
+            });
+          });
+        });
       });
-    }
-
-    return entries;
+      dataMap[areaId] = areaData;
+    });
+    return dataMap;
   }, []);
 
-  // Generate mock PMMSY data only once when polygonData is set
+  // Generate mock data for all schemes
   useEffect(() => {
-    if (polygonData && mockPMMSYData.length === 0) {
-      const entries = generateMockPMMSYData(polygonData.features);
-      setMockPMMSYData(entries);
+    if (polygonData && !mockNonPMMSYData && !mockPMMSYData) {
+      const nonPMMSYData = generateMockData(polygonData.features);
+      const pmmsyData = generateMockPMMSYData(polygonData.features);
+      setMockNonPMMSYData(nonPMMSYData);
+      setMockPMMSYData(pmmsyData);
     }
-  }, [polygonData, mockPMMSYData.length, generateMockPMMSYData]);
+  }, [polygonData, mockNonPMMSYData, mockPMMSYData, generateMockPMMSYData]);
 
-  // Generate mock non-PMMSY data only once when polygonData is set
-  useEffect(() => {
-    if (polygonData && !mockNonPMMSYData) {
-      const data = generateMockData(polygonData.features);
-      setMockNonPMMSYData(data);
+  // Combine metric data based on scheme
+  const combinedMetricData = useMemo(() => {
+    if (!mockNonPMMSYData || !mockPMMSYData) return null;
+    if (selectedScheme === "PMMSY") {
+      const filteredData: Record<string, AreaMetricData> = {};
+      Object.entries(mockPMMSYData).forEach(([areaId, areaData]) => {
+        filteredData[areaId] = {};
+        Object.entries(areaData).forEach(([key, metrics]) => {
+          const [, gender, year, sector, activity] = key.split("_");
+          if (
+            (selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY) &&
+            (selectedActivityPMMSY === "all" || activity === selectedActivityPMMSY) &&
+            (selectedFinancialYearPMMSY === "all" || year === selectedFinancialYearPMMSY)
+          ) {
+            filteredData[areaId][`PMMSY_${gender}_${year}`] = metrics;
+          }
+        });
+      });
+      return filteredData;
     }
-  }, [polygonData, mockNonPMMSYData]);
+    return mockNonPMMSYData;
+  }, [
+    mockNonPMMSYData,
+    mockPMMSYData,
+    selectedScheme,
+    selectedSectorPMMSY,
+    selectedActivityPMMSY,
+    selectedFinancialYearPMMSY,
+  ]);
 
-  // Pre-index PMMSY data for faster filtering
-  const pmmsyDataIndex = useMemo(() => {
-    const index: Record<string, PMMSYRawEntry[]> = {};
-    mockPMMSYData.forEach((entry) => {
-      const sector = entry["FISHERIES_SECTOR_OF_THE_STATE/UT"]?.toLowerCase() || "unknown";
-      const activity = entry["NAME_OF_THE_ACTIVITY"]?.toLowerCase() || "unknown";
-      const year = entry["FINANCIAL_YEAR"]?.toLowerCase() || "unknown";
-      const key = `${sector}_${activity}_${year}`;
-      if (!index[key]) index[key] = [];
-      index[key].push(entry);
-    });
-    return index;
-  }, [mockPMMSYData]);
-
-  // Optimized PMMSY dashboard data aggregation
-  const aggregatePMMSYDashboardData = useCallback((
-    selectedSector: string,
-    selectedActivity: string,
-    selectedFinancialYear: string
-  ): {
-    global: PMMSYAggregatedData;
-    areaSpecific: Record<string, PMMSYAggregatedData>;
-  } => {
+  // Aggregate PMMSY data for charts
+  const aggregatePMMSYChartData = useCallback(() => {
+    if (!mockPMMSYData) return;
     const globalMetrics: PMMSYAggregatedData = {
       totalProjects: 0,
       totalInvestment: 0,
@@ -377,80 +313,35 @@ const App: React.FC = () => {
       sectorDistribution: [],
     };
 
-    const areaSpecificMetrics: Record<string, PMMSYAggregatedData> = {};
     const projectsByStateUTMap = new Map<string, number>();
     const sectorDistributionMap = new Map<string, number>();
 
-    // Construct index key for filtering
-    const sectorKey = selectedSector === "all" ? ".*" : selectedSector.toLowerCase();
-    const activityKey = selectedActivity === "all" ? ".*" : selectedActivity.toLowerCase();
-    const yearKey = selectedFinancialYear === "all" ? ".*" : selectedFinancialYear.toLowerCase();
-    const indexKeyPattern = new RegExp(`^${sectorKey}_${activityKey}_${yearKey}$`);
+    Object.entries(mockPMMSYData).forEach(([areaId, areaData]) => {
+      const feature = polygonData?.features.find((f) => f.properties.shapeID === areaId);
+      const stateName = feature?.properties.state_name || "Unknown";
 
-    // Aggregate data from indexed entries
-    Object.keys(pmmsyDataIndex).forEach((key) => {
-      if (!indexKeyPattern.test(key)) return;
-      const entries = pmmsyDataIndex[key];
-
-      entries.forEach((entry) => {
-        const investment = parseFloat(entry["SUM_OF_TOTAL_COST_(CENTRAL_SHARE+_STATE_SHARE+_BENEFICIARY_CONTRIBUTION)"]?.toString()) || 0;
-        const fishOutput = parseFloat(entry["TOTAL_OUTPUT"]?.toString()) || 0;
-        const totalEmpWomen = parseInt(entry["TOTAL_EMPLOYMENT_GENERATED_(WOMEN)"]?.toString()) || 0;
-        const totalEmpMen = parseInt(entry["TOTAL_EMPLOYMENT_GENERATED_(MEN)"]?.toString()) || 0;
-        const directEmpWomen = parseInt(entry["DIRECT_EMPLOYMENT_GENERATED_(WOMEN)"]?.toString()) || 0;
-        const directEmpMen = parseInt(entry["DIRECT_EMPLOYMENT_GENERATED_(MEN)"]?.toString()) || 0;
-        const indirectEmpWomen = parseInt(entry["INDIRECT_EMPLOYMENT_GENERATED_(WOMEN)"]?.toString()) || 0;
-        const indirectEmpMen = parseInt(entry["INDIRECT_EMPLOYMENT_GENERATED_(MEN)"]?.toString()) || 0;
-
-        // Global aggregation
-        globalMetrics.totalProjects += 1;
-        globalMetrics.totalInvestment += investment;
-        globalMetrics.fishOutput += fishOutput;
-        globalMetrics.totalEmploymentGenerated += totalEmpWomen + totalEmpMen;
-        globalMetrics.directEmploymentWomen += directEmpWomen;
-        globalMetrics.directEmploymentMen += directEmpMen;
-        globalMetrics.indirectEmploymentWomen += indirectEmpWomen;
-        globalMetrics.indirectEmploymentMen += indirectEmpMen;
-
-        // Aggregation for Projects by State/UT
-        const stateName = entry["NAME_OF_THE_STATE/UT"];
-        projectsByStateUTMap.set(stateName, (projectsByStateUTMap.get(stateName) || 0) + 1);
-
-        // Aggregation for Sector Distribution
-        const sector = entry["FISHERIES_SECTOR_OF_THE_STATE/UT"];
-        sectorDistributionMap.set(sector, (sectorDistributionMap.get(sector) || 0) + 1);
-
-        // Area-specific aggregation
-        const areaShapeID =
-          shapeIdMap[`${stateName}_${entry["BENEFICIARY_DISTRICT"]}_${entry["BENEFICIARY_TALUK_/_MANDAL"]}`] ||
-          shapeIdMap[`${stateName}_${entry["BENEFICIARY_DISTRICT"]}`] ||
-          shapeIdMap[stateName];
-        if (areaShapeID) {
-          if (!areaSpecificMetrics[areaShapeID]) {
-            areaSpecificMetrics[areaShapeID] = {
-              totalProjects: 0,
-              totalInvestment: 0,
-              fishOutput: 0,
-              totalEmploymentGenerated: 0,
-              directEmploymentMen: 0,
-              directEmploymentWomen: 0,
-              indirectEmploymentMen: 0,
-              indirectEmploymentWomen: 0,
-              projectsByStateUT: [],
-              sectorDistribution: [],
-            };
-          }
-          areaSpecificMetrics[areaShapeID].totalProjects += 1;
-          areaSpecificMetrics[areaShapeID].totalInvestment += investment;
-          areaSpecificMetrics[areaShapeID].fishOutput += fishOutput;
-          areaSpecificMetrics[areaShapeID].totalEmploymentGenerated += totalEmpWomen + totalEmpMen;
-          areaSpecificMetrics[areaShapeID].directEmploymentWomen += directEmpWomen;
-          areaSpecificMetrics[areaShapeID].directEmploymentMen += directEmpMen;
-          areaSpecificMetrics[areaShapeID].indirectEmploymentWomen += indirectEmpWomen;
-          areaSpecificMetrics[areaShapeID].indirectEmploymentMen += indirectEmpMen;
+      Object.entries(areaData).forEach(([key, metrics]) => {
+        const [, , , sector, activity] = key.split("_");
+        if (
+          (selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY) &&
+          (selectedActivityPMMSY === "all" || activity === selectedActivityPMMSY) &&
+          (selectedFinancialYearPMMSY === "all" || key.includes(selectedFinancialYearPMMSY))
+        ) {
+          globalMetrics.totalProjects += metrics.totalProjects || 0;
+          globalMetrics.totalInvestment += metrics.totalInvestment || 0;
+          globalMetrics.fishOutput += metrics.fishOutput || 0;
+          projectsByStateUTMap.set(stateName, (projectsByStateUTMap.get(stateName) || 0) + (metrics.totalProjects || 0));
+          sectorDistributionMap.set(sector, (sectorDistributionMap.get(sector) || 0) + (metrics.totalProjects || 0));
         }
       });
     });
+
+    // Mock employment data for charts
+    globalMetrics.totalEmploymentGenerated = Math.floor(globalMetrics.totalProjects * (5 + Math.random() * 10));
+    globalMetrics.directEmploymentMen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.4);
+    globalMetrics.directEmploymentWomen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.3);
+    globalMetrics.indirectEmploymentMen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.2);
+    globalMetrics.indirectEmploymentWomen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.1);
 
     globalMetrics.projectsByStateUT = Array.from(projectsByStateUTMap.entries()).map(([name, value]) => ({
       name,
@@ -461,8 +352,15 @@ const App: React.FC = () => {
       value,
     }));
 
-    return { global: globalMetrics, areaSpecific: areaSpecificMetrics };
-  }, [pmmsyDataIndex, shapeIdMap]);
+    setGlobalPMMSYMetrics(globalMetrics);
+  }, [mockPMMSYData, selectedSectorPMMSY, selectedActivityPMMSY, selectedFinancialYearPMMSY, polygonData]);
+
+  // Update PMMSY chart data when filters change
+  useEffect(() => {
+    if (selectedScheme === "PMMSY") {
+      aggregatePMMSYChartData();
+    }
+  }, [selectedScheme, selectedSectorPMMSY, selectedActivityPMMSY, selectedFinancialYearPMMSY, aggregatePMMSYChartData]);
 
   // Debounced state updates for PMMSY filters
   const debounce = (func: (...args: any[]) => void, wait: number) => {
@@ -478,37 +376,19 @@ const App: React.FC = () => {
   const debouncedSetSelectedFinancialYearPMMSY = useCallback(debounce(setSelectedFinancialYearPMMSY, 300), []);
 
   // PMMSY filter options
-  const pmmsySectors = useMemo(() => {
-    const sectors = new Set<string>();
-    mockPMMSYData.forEach((entry: PMMSYRawEntry) => {
-      if (entry["FISHERIES_SECTOR_OF_THE_STATE/UT"]) {
-        sectors.add(entry["FISHERIES_SECTOR_OF_THE_STATE/UT"]);
-      }
-    });
-    return ["all", ...Array.from(sectors).sort()];
-  }, [mockPMMSYData]);
+  const pmmsySectors = useMemo(() => ["all", "Inland", "Marine"], []);
+  const pmmsyActivityTypes = useMemo(
+    () => [
+      "all",
+      "Infrastructure and Post-harvest Management",
+      "Fisheries Management and Regulatory Framework",
+      "Enhancement of Production and Productivity",
+    ],
+    []
+  );
+  const pmmsyFinancialYears = useMemo(() => ["all", "2021", "2022", "2023", "2024"], []);
 
-  const pmmsyActivityTypes = useMemo(() => {
-    const activities = new Set<string>();
-    mockPMMSYData.forEach((entry: PMMSYRawEntry) => {
-      if (entry["NAME_OF_THE_ACTIVITY"]) {
-        activities.add(entry["NAME_OF_THE_ACTIVITY"]);
-      }
-    });
-    return ["all", ...Array.from(activities).sort()];
-  }, [mockPMMSYData]);
-
-  const pmmsyFinancialYears = useMemo(() => {
-    const years = new Set<string>();
-    mockPMMSYData.forEach((entry: PMMSYRawEntry) => {
-      if (entry["FINANCIAL_YEAR"]) {
-        years.add(entry["FINANCIAL_YEAR"]);
-      }
-    });
-    return ["all", ...Array.from(years).sort()];
-  }, [mockPMMSYData]);
-
-  // Fetch GeoJSON and aggregate data
+  // Fetch GeoJSON and set metric data
   useEffect(() => {
     fetch("/indianmap.geojson")
       .then((res) => {
@@ -525,33 +405,22 @@ const App: React.FC = () => {
           features: filteredFeatures,
         };
         setPolygonData(filteredGeoJsonData);
-
-        // Set the metric data to the generated mock data
-        setMetricData(mockNonPMMSYData);
-
-        // Aggregate PMMSY dashboard data only if PMMSY is selected
-        if (selectedScheme === "PMMSY") {
-          const { global, areaSpecific } = aggregatePMMSYDashboardData(
-            selectedSectorPMMSY,
-            selectedActivityPMMSY,
-            selectedFinancialYearPMMSY
-          );
-          setGlobalPMMSYMetrics(global);
-          setPmmsyAreaSpecificMetrics(areaSpecific);
-        }
+        setMetricData(combinedMetricData);
       })
       .catch((err) => {
         console.error("GeoJSON load error:", err);
         setError(err.message);
       });
-  }, [
-    selectedScheme,
-    selectedSectorPMMSY,
-    selectedActivityPMMSY,
-    selectedFinancialYearPMMSY,
-    aggregatePMMSYDashboardData,
-    mockNonPMMSYData,
-  ]);
+  }, [combinedMetricData]);
+
+  // Update selectedMetric when scheme changes
+  useEffect(() => {
+    if (selectedScheme === "PMMSY") {
+      setSelectedMetric("totalProjects");
+    } else {
+      setSelectedMetric("beneficiaries");
+    }
+  }, [selectedScheme]);
 
   // Filtered GeoJSON data
   const filteredGeoJsonData = useMemo(() => {
@@ -591,7 +460,7 @@ const App: React.FC = () => {
     return num.toLocaleString();
   };
 
-  // KPIs for generic metrics
+  // KPIs for all metrics
   const kpis = useMemo(() => {
     if (!metricData || !filteredGeoJsonData) return null;
     const relevantFeatureIds = filteredGeoJsonData.features
@@ -615,7 +484,7 @@ const App: React.FC = () => {
     return { average, min, max };
   }, [metricData, selectedMetric, demographicKey, filteredGeoJsonData, mapView]);
 
-  // Color function
+  // Color function for all metrics
   const getColor = (metric: string, value: number | string): string => {
     const categoryColors: Record<string, string> = {
       PMMKSS: "#6366f1",
@@ -650,27 +519,49 @@ const App: React.FC = () => {
       if (typeof value === "number" && value >= 6000) return "#fb923c";
       if (typeof value === "number" && value >= 4000) return "#fdba74";
       return "#fed7aa";
+    } else if (metric === "totalProjects") {
+      if (typeof value === "number" && value >= 80) return "#6366f1";
+      if (typeof value === "number" && value >= 50) return "#8b5cf6";
+      if (typeof value === "number" && value >= 30) return "#a78bfa";
+      return "#c4b5fd";
+    } else if (metric === "totalInvestment") {
+      if (typeof value === "number" && value >= 4000000) return "#059669";
+      if (typeof value === "number" && value >= 2500000) return "#10b981";
+      if (typeof value === "number" && value >= 1000000) return "#34d399";
+      return "#6ee7b7";
+    } else if (metric === "fishOutput") {
+      if (typeof value === "number" && value >= 150) return "#f97316";
+      if (typeof value === "number" && value >= 100) return "#fb923c";
+      if (typeof value === "number" && value >= 50) return "#fdba74";
+      return "#fed7aa";
     }
     return "#6b7280";
   };
 
   // Format metric value
   const formatMetricValue = (metric: string, value: number): string => {
-    if (metric === "beneficiaries_last_24h" || metric === "registrations_last_24h") {
+    if (metric === "beneficiaries_last_24h" || metric === "registrations_last_24h" || metric === "totalProjects") {
       return value.toLocaleString();
     }
-    if (metric === "funds" || metric === "funds_used") {
+    if (metric === "funds" || metric === "funds_used" || metric === "totalInvestment") {
       return `₹${formatNumber(value)}`;
+    }
+    if (metric === "fishOutput") {
+      return `${value.toFixed(2)} Tonnes`;
     }
     return formatNumber(value);
   };
 
   // Metric display name
   const getMetricDisplayName = (metric: string): string => {
-    if (metric === "beneficiaries") return "Beneficiaries";
-    if (metric === "funds") return "Funds Allocated";
-    if (metric === "registrations") return "Total Registrations";
-    return "Unknown Metric";
+    return {
+      beneficiaries: "Beneficiaries",
+      funds: "Funds Allocated",
+      registrations: "Total Registrations",
+      totalProjects: "Total Projects",
+      totalInvestment: "Total Investment",
+      fishOutput: "Fish Output",
+    }[metric] || "Unknown Metric";
   };
 
   // Metric icon
@@ -678,6 +569,9 @@ const App: React.FC = () => {
     if (metric === "beneficiaries") return <Users className="w-5 h-5" />;
     if (metric === "funds") return <IndianRupee className="w-5 h-5" />;
     if (metric === "registrations") return <TrendingUp className="w-5 h-5" />;
+    if (metric === "totalProjects") return <TrendingUp className="w-5 h-5" />;
+    if (metric === "totalInvestment") return <IndianRupee className="w-5 h-5" />;
+    if (metric === "fishOutput") return <Fish className="w-5 h-5" />;
     return <TrendingUp className="w-5 h-5" />;
   };
 
@@ -688,6 +582,11 @@ const App: React.FC = () => {
     if (selectedScheme !== "all") filters.push(schemeDisplayNames[selectedScheme]);
     if (selectedGender !== "all") filters.push(genderDisplayNames[selectedGender]);
     if (selectedYear !== "all") filters.push(yearDisplayNames[selectedYear]);
+    if (selectedScheme === "PMMSY") {
+      if (selectedSectorPMMSY !== "all") filters.push(selectedSectorPMMSY);
+      if (selectedActivityPMMSY !== "all") filters.push(selectedActivityPMMSY);
+      if (selectedFinancialYearPMMSY !== "all") filters.push(selectedFinancialYearPMMSY);
+    }
     const demographicName = filters.length > 0 ? filters.join(", ") : "Overall";
     return `${metricName} (${demographicName})`;
   };
@@ -712,11 +611,29 @@ const App: React.FC = () => {
       { label: "6K-8K", min: 6000, max: 8000, color: "#fb923c" },
       { label: ">=8K", min: 8000, max: Infinity, color: "#f97316" },
     ],
+    totalProjects: [
+      { label: "<30", min: 0, max: 30, color: "#c4b5fd" },
+      { label: "30-50", min: 30, max: 50, color: "#a78bfa" },
+      { label: "50-80", min: 50, max: 80, color: "#8b5cf6" },
+      { label: ">=80", min: 80, max: Infinity, color: "#6366f1" },
+    ],
+    totalInvestment: [
+      { label: "<10L", min: 0, max: 1000000, color: "#6ee7b7" },
+      { label: "10L-25L", min: 1000000, max: 2500000, color: "#34d399" },
+      { label: "25L-40L", min: 2500000, max: 4000000, color: "#10b981" },
+      { label: ">=40L", min: 4000000, max: Infinity, color: "#059669" },
+    ],
+    fishOutput: [
+      { label: "<50T", min: 0, max: 50, color: "#fed7aa" },
+      { label: "50-100T", min: 50, max: 100, color: "#fdba74" },
+      { label: "100-150T", min: 100, max: 150, color: "#fb923c" },
+      { label: ">=150T", min: 150, max: Infinity, color: "#f97316" },
+    ],
   };
 
   // Pie chart data
   const pieData = useMemo(() => {
-    if (!metricData || !filteredGeoJsonData || selectedScheme === "PMMSY") return [];
+    if (!metricData || !filteredGeoJsonData) return [];
     const currentBrackets = brackets[selectedMetric];
     const counts = currentBrackets.map((bracket) => ({ ...bracket, count: 0 }));
 
@@ -741,12 +658,12 @@ const App: React.FC = () => {
       value: c.count,
       color: c.color,
     }));
-  }, [metricData, filteredGeoJsonData, selectedMetric, demographicKey, mapView, selectedScheme]);
+  }, [metricData, filteredGeoJsonData, selectedMetric, demographicKey, mapView]);
 
   // Bar chart data
   const overallMetricDataForSorting = useMemo(() => {
-    if (!metricData || !polygonData || selectedScheme === "PMMSY") return {};
-    const overallKey = `all_all_all`;
+    if (!metricData || !polygonData) return {};
+    const overallKey = selectedScheme === "PMMSY" ? `PMMSY_all_all` : `all_all_all`;
     const data: Record<string, number> = {};
     polygonData.features.forEach((feature) => {
       data[feature.properties.shapeID] = metricData[feature.properties.shapeID]?.[overallKey]?.[selectedMetric] ?? 0;
@@ -755,7 +672,7 @@ const App: React.FC = () => {
   }, [metricData, polygonData, selectedMetric, selectedScheme]);
 
   const barData = useMemo(() => {
-    if (!metricData || !polygonData || selectedScheme === "PMMSY") return { data: [], keys: [], displayNamesMap: {} };
+    if (!metricData || !polygonData) return { data: [], keys: [], displayNamesMap: {} };
 
     const featuresForBarChart = polygonData.features.filter(
       (f) =>
@@ -824,22 +741,49 @@ const App: React.FC = () => {
 
   // Handle area click
   const handleAreaClick = (areaDetails: any) => {
-    if (selectedScheme === "PMMSY" && pmmsyAreaSpecificMetrics) {
-      const pmmsySpecificData = pmmsyAreaSpecificMetrics[areaDetails.id] || {
+    if (selectedScheme === "PMMSY") {
+      const metrics = metricData[areaDetails.id]?.[demographicKey] || {
         totalProjects: 0,
         totalInvestment: 0,
         fishOutput: 0,
-        totalEmploymentGenerated: 0,
-        directEmploymentMen: 0,
-        directEmploymentWomen: 0,
-        indirectEmploymentMen: 0,
-        indirectEmploymentWomen: 0,
-        projectsByStateUT: [],
-        sectorDistribution: [],
       };
-      setSelectedAreaDetails({ ...areaDetails, pmmsyMetrics: pmmsySpecificData });
+      // Compute employment metrics for the selected area
+      const totalEmploymentGenerated = Math.floor(metrics.totalProjects * (5 + Math.random() * 10));
+      const pmmsyMetrics: PMMSYAggregatedData = {
+        totalProjects: metrics.totalProjects || 0,
+        totalInvestment: metrics.totalInvestment || 0,
+        fishOutput: metrics.fishOutput || 0,
+        totalEmploymentGenerated,
+        directEmploymentMen: Math.floor(totalEmploymentGenerated * 0.4),
+        directEmploymentWomen: Math.floor(totalEmploymentGenerated * 0.3),
+        indirectEmploymentMen: Math.floor(totalEmploymentGenerated * 0.2),
+        indirectEmploymentWomen: Math.floor(totalEmploymentGenerated * 0.1),
+        projectsByStateUT: [], // Not used in AreaDetailsPopup
+        sectorDistribution: [], // Not used in AreaDetailsPopup
+      };
+      setSelectedAreaDetails({
+        ...areaDetails,
+        name: areaDetails.name || "Unknown Area",
+        officer: officerNames[areaDetails.id] || "Unknown Officer",
+        level: areaDetails.level || "Unknown",
+        pmmsyMetrics,
+      });
     } else {
-      setSelectedAreaDetails(areaDetails);
+      const metrics = metricData[areaDetails.id]?.[demographicKey] || {
+        beneficiaries: 0,
+        funds: 0,
+        registrations: 0,
+        funds_used: 0,
+        beneficiaries_last_24h: 0,
+        registrations_last_24h: 0,
+      };
+      setSelectedAreaDetails({
+        ...areaDetails,
+        name: areaDetails.name || "Unknown Area",
+        officer: officerNames[areaDetails.id] || "Unknown Officer",
+        level: areaDetails.level || "Unknown",
+        metrics,
+      });
     }
   };
 
@@ -883,25 +827,31 @@ const App: React.FC = () => {
               </h1>
             </div>
             <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-x-2">
-              {selectedScheme !== "PMMSY" && (
-                <>
-                  <label htmlFor="metric-select" className="font-semibold text-xs sm:text-sm">
-                    Metric
-                  </label>
-                  <select
-                    id="metric-select"
-                    value={selectedMetric}
-                    onChange={(e) =>
-                      setSelectedMetric(e.target.value as "beneficiaries" | "funds" | "registrations")
-                    }
-                    className="p-1 bg-gray-50 border border-gray-300 rounded-md text-xs sm:text-sm"
-                  >
+              <label htmlFor="metric-select" className="font-semibold text-xs sm:text-sm">
+                Metric
+              </label>
+              <select
+                id="metric-select"
+                value={selectedMetric}
+                onChange={(e) =>
+                  setSelectedMetric(e.target.value as "beneficiaries" | "funds" | "registrations" | PMMSYMetricKey)
+                }
+                className="p-1 bg-gray-50 border border-gray-300 rounded-md text-xs sm:text-sm"
+              >
+                {selectedScheme === "PMMSY" ? (
+                  <>
+                    <option value="totalProjects">Total Projects</option>
+                    <option value="totalInvestment">Total Investment</option>
+                    <option value="fishOutput">Fish Output</option>
+                  </>
+                ) : (
+                  <>
                     <option value="beneficiaries">Beneficiaries</option>
                     <option value="funds">Funds Allocated</option>
                     <option value="registrations">Total Registrations</option>
-                  </select>
-                </>
-              )}
+                  </>
+                )}
+              </select>
             </div>
             <div className="flex items-center gap-x-2">
               <button
@@ -980,21 +930,19 @@ const App: React.FC = () => {
               onAreaClick={handleAreaClick}
               mapView={mapView}
             />
-            {selectedScheme !== "PMMSY" && (
-              <div className="absolute bottom-4 left-4 bg-white/90 p-3 rounded-lg shadow-md border border-gray-200">
-                <h4 className="text-sm font-semibold mb-2 text-gray-800">
-                  {getMetricDisplayName(selectedMetric)} Legend
-                </h4>
-                <div className="space-y-1">
-                  {brackets[selectedMetric].map((bracket, index) => (
-                    <div key={index} className="flex items-center">
-                      <div className="w-4 h-4 mr-2 rounded-sm" style={{ backgroundColor: bracket.color }}></div>
-                      <span className="text-xs text-gray-700">{bracket.label}</span>
-                    </div>
-                  ))}
-                </div>
+            <div className="absolute bottom-4 left-4 bg-white/90 p-3 rounded-lg shadow-md border border-gray-200">
+              <h4 className="text-sm font-semibold mb-2 text-gray-800">
+                {getMetricDisplayName(selectedMetric)} Legend
+              </h4>
+              <div className="space-y-1">
+                {brackets[selectedMetric].map((bracket, index) => (
+                  <div key={index} className="flex items-center">
+                    <div className="w-4 h-4 mr-2 rounded-sm" style={{ backgroundColor: bracket.color }}></div>
+                    <span className="text-xs text-gray-700">{bracket.label}</span>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
           </div>
           <div className={`${selectedAreaDetails ? "col-span-2" : "col-span-2"} space-y-2 ${selectedAreaDetails ? "block" : "hidden"} lg:block`}>
             {selectedScheme === "PMMSY" ? (
