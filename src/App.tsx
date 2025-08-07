@@ -8,6 +8,7 @@ import {
   ProjectsBarChart,
   DistributionPieChart,
   TopAreasBarChart,
+  EmploymentBarChart,
 } from "./components/Charts";
 import pmmsyData from "./data/pmmsyData.json";
 
@@ -211,42 +212,41 @@ const App: React.FC = () => {
 
   // Generate mock PMMSY data, aligned with other schemes
   const generateMockPMMSYData = useCallback((areas: GeoJSONFeature[]): Record<string, AreaMetricData> => {
-  const dataMap: Record<string, AreaMetricData> = {};
-  const genders: GenderKey[] = ["male", "female", "transgender"];
-  const years: YearKey[] = ["2021", "2022", "2023", "2024"];
-  const sectors = ["Inland", "Marine"];
+    const dataMap: Record<string, AreaMetricData> = {};
+    const genders: GenderKey[] = ["male", "female", "transgender"];
+    const years: YearKey[] = ["2021", "2022", "2023", "2024"];
+    const sectors = ["Inland", "Marine"];
 
-  areas.forEach((area) => {
-    const areaId = area.properties.shapeID;
-    const areaData: AreaMetricData = {};
-    // Introduce significant variation across areas
-    const regionalBias = 0.1 + Math.random() * 1.9; // Ranges from 0.1 to 2.0
+    areas.forEach((area) => {
+      const areaId = area.properties.shapeID;
+      const areaData: AreaMetricData = {};
+      const regionalBias = 0.1 + Math.random() * 1.9;
 
-    genders.forEach((gender) => {
-      years.forEach((year) => {
-        sectors.forEach((sector) => {
-          const key = `PMMSY_${gender}_${year}_${sector}`;
-          const genderMod = gender === "male" ? 1.2 : gender === "female" ? 0.9 : 0.8;
-          const yearMod = year === "2021" ? 0.8 : year === "2022" ? 0.9 : year === "2023" ? 1.0 : 1.1;
-          const sectorMod = sector === "Inland" ? 1.1 : 0.9;
-          const weight = genderMod * yearMod * sectorMod * regionalBias;
+      genders.forEach((gender) => {
+        years.forEach((year) => {
+          sectors.forEach((sector) => {
+            const key = `PMMSY_${gender}_${year}_${sector}`;
+            const genderMod = gender === "male" ? 1.2 : gender === "female" ? 0.9 : 0.8;
+            const yearMod = year === "2021" ? 0.8 : year === "2022" ? 0.9 : year === "2023" ? 1.0 : 1.1;
+            const sectorMod = sector === "Inland" ? 1.1 : 0.9;
+            const weight = genderMod * yearMod * sectorMod * regionalBias;
 
-          const totalProjects = Math.floor(weight * (3 + Math.random() * 1)); // 10 to 100 before weight
-          const totalInvestment = Math.floor(weight * (50000 + Math.random() * 450000)); // 500k to 5M before weight
-          const fishOutput = Math.floor(weight * (5 + Math.random() * 1)); // 20 to 200 before weight
+            const totalProjects = Math.floor(weight * (3 + Math.random() * 1));
+            const totalInvestment = Math.floor(weight * (50000 + Math.random() * 450000));
+            const fishOutput = Math.floor(weight * (5 + Math.random() * 1));
 
-          areaData[key] = {
-            totalProjects,
-            totalInvestment,
-            fishOutput,
-          };
+            areaData[key] = {
+              totalProjects,
+              totalInvestment,
+              fishOutput,
+            };
+          });
         });
       });
+      dataMap[areaId] = areaData;
     });
-    dataMap[areaId] = areaData;
-  });
-  return dataMap;
-}, []);
+    return dataMap;
+  }, []);
 
   // Generate mock data for all schemes
   useEffect(() => {
@@ -330,7 +330,6 @@ const App: React.FC = () => {
       });
     });
 
-    // Mock employment data for charts
     globalMetrics.totalEmploymentGenerated = Math.floor(globalMetrics.totalProjects * (5 + Math.random() * 10));
     globalMetrics.directEmploymentMen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.4);
     globalMetrics.directEmploymentWomen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.3);
@@ -733,7 +732,6 @@ const App: React.FC = () => {
         totalInvestment: 0,
         fishOutput: 0,
       };
-      // Compute employment metrics for the selected area
       const totalEmploymentGenerated = Math.floor(metrics.totalProjects * (5 + Math.random() * 10));
       const pmmsyMetrics: PMMSYAggregatedData = {
         totalProjects: metrics.totalProjects || 0,
@@ -935,27 +933,15 @@ const App: React.FC = () => {
                   getColor={getColor}
                 />
                 <ProjectsBarChart projectsByStateUT={globalPMMSYMetrics.projectsByStateUT} />
-                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2">
-                  <h4 className="text-md font-semibold text-gray-800 mt-4 pl-4">Employment Generation</h4>
-                  <div className="grid grid-cols-2 gap-3 p-4">
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-sm font-medium text-gray-600">Direct (Women)</p>
-                      <p className="text-lg font-bold text-gray-800">{globalPMMSYMetrics.directEmploymentWomen.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-sm font-medium text-gray-600">Direct (Men)</p>
-                      <p className="text-lg font-bold text-gray-800">{globalPMMSYMetrics.directEmploymentMen.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-sm font-medium text-gray-600">Indirect (Women)</p>
-                      <p className="text-lg font-bold text-gray-800">{globalPMMSYMetrics.indirectEmploymentWomen.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-sm font-medium text-gray-600">Indirect (Men)</p>
-                      <p className="text-lg font-bold text-gray-800">{globalPMMSYMetrics.indirectEmploymentMen.toLocaleString()}</p>
-                    </div>
-                  </div>
-                </div>
+                <EmploymentBarChart
+                  employmentData={{
+                    directEmploymentMen: globalPMMSYMetrics.directEmploymentMen,
+                    directEmploymentWomen: globalPMMSYMetrics.directEmploymentWomen,
+                    indirectEmploymentMen: globalPMMSYMetrics.indirectEmploymentMen,
+                    indirectEmploymentWomen: globalPMMSYMetrics.indirectEmploymentWomen,
+                  }}
+                  getColor={getColor}
+                />
               </>
             ) : (
               <>

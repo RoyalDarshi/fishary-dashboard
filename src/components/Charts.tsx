@@ -40,6 +40,17 @@ interface TopAreasBarChartProps {
   selectedBarChartCategory: "scheme" | "gender" | "year";
 }
 
+// Props interface for EmploymentBarChart
+interface EmploymentBarChartProps {
+  employmentData: {
+    directEmploymentMen: number;
+    directEmploymentWomen: number;
+    indirectEmploymentMen: number;
+    indirectEmploymentWomen: number;
+  };
+  getColor: (metric: string, value: string) => string;
+}
+
 // Sector Distribution Pie Chart for PMMSY
 export const SectorDistributionPieChart: React.FC<SectorDistributionPieChartProps> = ({
   sectorDistribution,
@@ -119,6 +130,66 @@ export const DistributionPieChart: React.FC<DistributionPieChartProps> = ({ pieD
           </Pie>
           <Tooltip />
         </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
+// Employment Bar Chart for PMMSY
+export const EmploymentBarChart: React.FC<EmploymentBarChartProps> = ({ employmentData, getColor }) => {
+  const data = [
+    {
+      name: "Direct Employment",
+      Men: employmentData.directEmploymentMen,
+      Women: employmentData.directEmploymentWomen,
+    },
+    {
+      name: "Indirect Employment",
+      Men: employmentData.indirectEmploymentMen,
+      Women: employmentData.indirectEmploymentWomen,
+    },
+  ];
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white border border-gray-300 rounded p-2 shadow text-xs">
+          <p className="font-semibold">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <div key={`tooltip-${index}`} className="flex items-center gap-2">
+              <span
+                className="inline-block w-3 h-3 rounded-full"
+                style={{ backgroundColor: entry.color }}
+              />
+              <span>{entry.name}</span>:
+              <span className="font-medium">{entry.value.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2">
+      <h3 className="text-lg font-semibold text-gray-900 pl-4">Employment Generation</h3>
+      <ResponsiveContainer width="100%" height={window.innerWidth < 640 ? 250 : 290}>
+        <BarChart
+          layout="horizontal"
+          data={data}
+          margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
+        >
+          <YAxis
+            type="number"
+            tickFormatter={(value) => value.toLocaleString()}
+            tick={{ fontSize: window.innerWidth < 640 ? 8 : 10 }}
+          />
+          <XAxis type="category" dataKey="name" tick={{ fontSize: window.innerWidth < 640 ? 8 : 10 }} />
+          <Tooltip content={<CustomTooltip />} />
+          <Bar dataKey="Men" fill={getColor("gender", "male")} stackId="a" />
+          <Bar dataKey="Women" fill={getColor("gender", "female")} stackId="a" />
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );
