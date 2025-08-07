@@ -211,41 +211,42 @@ const App: React.FC = () => {
 
   // Generate mock PMMSY data, aligned with other schemes
   const generateMockPMMSYData = useCallback((areas: GeoJSONFeature[]): Record<string, AreaMetricData> => {
-    const dataMap: Record<string, AreaMetricData> = {};
-    const genders: GenderKey[] = ["all", "male", "female", "transgender"];
-    const years: YearKey[] = ["all", "2021", "2022", "2023", "2024"];
-    const sectors = ["all", "Inland", "Marine"];
+  const dataMap: Record<string, AreaMetricData> = {};
+  const genders: GenderKey[] = ["male", "female", "transgender"];
+  const years: YearKey[] = ["2021", "2022", "2023", "2024"];
+  const sectors = ["Inland", "Marine"];
 
-    areas.forEach((area) => {
-      const areaId = area.properties.shapeID;
-      const areaData: AreaMetricData = {};
-      const regionalBias = area.properties.level === "state" ? 1.0 + Math.random() * 0.1 : 0.9 + Math.random() * 0.2;
+  areas.forEach((area) => {
+    const areaId = area.properties.shapeID;
+    const areaData: AreaMetricData = {};
+    // Introduce significant variation across areas
+    const regionalBias = 0.1 + Math.random() * 1.9; // Ranges from 0.1 to 2.0
 
-      genders.forEach((gender) => {
-        years.forEach((year) => {
-          sectors.forEach((sector) => {
-            const key = `PMMSY_${gender}_${year}_${sector}`;
-            const genderMod = gender === "all" ? 1 : gender === "male" ? 1.2 : gender === "female" ? 0.9 : 0.8;
-            const yearMod = year === "all" ? 1 : year === "2021" ? 0.8 : year === "2022" ? 0.9 : year === "2023" ? 1.0 : 1.1;
-            const sectorMod = sector === "all" ? 1 : sector === "Inland" ? 1.1 : 0.9;
-            const weight = genderMod * yearMod * sectorMod * regionalBias;
+    genders.forEach((gender) => {
+      years.forEach((year) => {
+        sectors.forEach((sector) => {
+          const key = `PMMSY_${gender}_${year}_${sector}`;
+          const genderMod = gender === "male" ? 1.2 : gender === "female" ? 0.9 : 0.8;
+          const yearMod = year === "2021" ? 0.8 : year === "2022" ? 0.9 : year === "2023" ? 1.0 : 1.1;
+          const sectorMod = sector === "Inland" ? 1.1 : 0.9;
+          const weight = genderMod * yearMod * sectorMod * regionalBias;
 
-            const totalProjects = Math.floor(weight * (10 + Math.random() * 90));
-            const totalInvestment = Math.floor(weight * (500000 + Math.random() * 4500000));
-            const fishOutput = Math.floor(weight * (20 + Math.random() * 180));
+          const totalProjects = Math.floor(weight * (3 + Math.random() * 1)); // 10 to 100 before weight
+          const totalInvestment = Math.floor(weight * (50000 + Math.random() * 450000)); // 500k to 5M before weight
+          const fishOutput = Math.floor(weight * (5 + Math.random() * 1)); // 20 to 200 before weight
 
-            areaData[key] = {
-              totalProjects,
-              totalInvestment,
-              fishOutput,
-            };
-          });
+          areaData[key] = {
+            totalProjects,
+            totalInvestment,
+            fishOutput,
+          };
         });
       });
-      dataMap[areaId] = areaData;
     });
-    return dataMap;
-  }, []);
+    dataMap[areaId] = areaData;
+  });
+  return dataMap;
+}, []);
 
   // Generate mock data for all schemes
   useEffect(() => {
@@ -263,16 +264,19 @@ const App: React.FC = () => {
     if (selectedScheme === "PMMSY") {
       const filteredData: Record<string, AreaMetricData> = {};
       Object.entries(mockPMMSYData).forEach(([areaId, areaData]) => {
-        filteredData[areaId] = {};
+        let totalMetrics = { totalProjects: 0, totalInvestment: 0, fishOutput: 0 };
         Object.entries(areaData).forEach(([key, metrics]) => {
           const [, gender, year, sector] = key.split("_");
-          if (
-            (selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY) &&
-            (selectedFinancialYearPMMSY === "all" || year === selectedFinancialYearPMMSY)
-          ) {
-            filteredData[areaId][`PMMSY_${gender}_${year}`] = metrics;
+          const genderMatch = selectedGender === "all" || gender === selectedGender;
+          const yearMatch = selectedFinancialYearPMMSY === "all" || year === selectedFinancialYearPMMSY;
+          const sectorMatch = selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY;
+          if (genderMatch && yearMatch && sectorMatch) {
+            totalMetrics.totalProjects += metrics.totalProjects || 0;
+            totalMetrics.totalInvestment += metrics.totalInvestment || 0;
+            totalMetrics.fishOutput += metrics.fishOutput || 0;
           }
         });
+        filteredData[areaId] = { "PMMSY_aggregated": totalMetrics };
       });
       return filteredData;
     }
@@ -281,6 +285,7 @@ const App: React.FC = () => {
     mockNonPMMSYData,
     mockPMMSYData,
     selectedScheme,
+    selectedGender,
     selectedSectorPMMSY,
     selectedFinancialYearPMMSY,
   ]);
@@ -309,11 +314,11 @@ const App: React.FC = () => {
       const stateName = feature?.properties.state_name || "Unknown";
 
       Object.entries(areaData).forEach(([key, metrics]) => {
-        const [, , year, sector] = key.split("_");
-        if (
-          (selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY) &&
-          (selectedFinancialYearPMMSY === "all" || year === selectedFinancialYearPMMSY)
-        ) {
+        const [, gender, year, sector] = key.split("_");
+        const genderMatch = selectedGender === "all" || gender === selectedGender;
+        const yearMatch = selectedFinancialYearPMMSY === "all" || year === selectedFinancialYearPMMSY;
+        const sectorMatch = selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY;
+        if (genderMatch && yearMatch && sectorMatch) {
           globalMetrics.totalProjects += metrics.totalProjects || 0;
           globalMetrics.totalInvestment += metrics.totalInvestment || 0;
           globalMetrics.fishOutput += metrics.fishOutput || 0;
@@ -342,14 +347,14 @@ const App: React.FC = () => {
     }));
 
     setGlobalPMMSYMetrics(globalMetrics);
-  }, [mockPMMSYData, selectedSectorPMMSY, selectedFinancialYearPMMSY, polygonData]);
+  }, [mockPMMSYData, selectedGender, selectedSectorPMMSY, selectedFinancialYearPMMSY, polygonData]);
 
   // Update PMMSY chart data when filters change
   useEffect(() => {
     if (selectedScheme === "PMMSY") {
       aggregatePMMSYChartData();
     }
-  }, [selectedScheme, selectedSectorPMMSY, selectedFinancialYearPMMSY, aggregatePMMSYChartData]);
+  }, [selectedScheme, selectedGender, selectedSectorPMMSY, selectedFinancialYearPMMSY, aggregatePMMSYChartData]);
 
   // Debounced state updates for PMMSY filters
   const debounce = (func: (...args: any[]) => void, wait: number) => {
@@ -360,8 +365,8 @@ const App: React.FC = () => {
     };
   };
 
-  const debouncedSetSelectedSectorPMMSY = useCallback(debounce(setSelectedSectorPMMSY, 300), []);
-  const debouncedSetSelectedFinancialYearPMMSY = useCallback(debounce(setSelectedFinancialYearPMMSY, 300), []);
+  const debouncedSetSelectedSectorPMMSY = useCallback(debounce(setSelectedSectorPMMSY, 0), []);
+  const debouncedSetSelectedFinancialYearPMMSY = useCallback(debounce(setSelectedFinancialYearPMMSY, 0), []);
 
   // PMMSY filter options
   const pmmsySectors = useMemo(() => ["all", "Inland", "Marine"], []);
@@ -425,6 +430,9 @@ const App: React.FC = () => {
 
   // Memoized demographic key
   const demographicKey = useMemo(() => {
+    if (selectedScheme === "PMMSY") {
+      return "PMMSY_aggregated";
+    }
     return `${selectedScheme}_${selectedGender}_${selectedYear}`;
   }, [selectedScheme, selectedGender, selectedYear]);
 
@@ -641,7 +649,7 @@ const App: React.FC = () => {
   // Bar chart data
   const overallMetricDataForSorting = useMemo(() => {
     if (!metricData || !polygonData) return {};
-    const overallKey = selectedScheme === "PMMSY" ? `PMMSY_all_all` : `all_all_all`;
+    const overallKey = selectedScheme === "PMMSY" ? "PMMSY_aggregated" : `all_all_all`;
     const data: Record<string, number> = {};
     polygonData.features.forEach((feature) => {
       data[feature.properties.shapeID] = metricData[feature.properties.shapeID]?.[overallKey]?.[selectedMetric] ?? 0;
@@ -665,7 +673,7 @@ const App: React.FC = () => {
         name: feature.properties.shapeName || "Unknown Area",
         overallValue: overallMetricDataForSorting[feature.properties.shapeID] || 0,
       }))
-      .sort((a, b) => b.overallValue - a.value)
+      .sort((a, b) => b.overallValue - a.overallValue)
       .slice(0, 10);
 
     let keys: string[] = [];
@@ -879,9 +887,9 @@ const App: React.FC = () => {
           selectedYear={selectedYear}
           setSelectedYear={setSelectedYear}
           selectedSectorPMMSY={selectedSectorPMMSY}
-          setSelectedSectorPMMSY={debouncedSetSelectedSectorPMMSY}
+          setSelectedSectorPMMSY={setSelectedSectorPMMSY}
           selectedFinancialYearPMMSY={selectedFinancialYearPMMSY}
-          setSelectedFinancialYearPMMSY={debouncedSetSelectedFinancialYearPMMSY}
+          setSelectedFinancialYearPMMSY={setSelectedFinancialYearPMMSY}
           pmmsySectors={pmmsySectors}
           pmmsyFinancialYears={pmmsyFinancialYears}
           globalPMMSYMetrics={globalPMMSYMetrics}
