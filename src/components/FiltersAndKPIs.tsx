@@ -1,6 +1,6 @@
 import React from 'react';
 import { IndianRupee, MapPin, TrendingUp, Users, CheckCircle } from "lucide-react";
-import type { PMMSYAggregatedData,SchemeKey, GenderKey, YearKey } from '../App';
+import type { PMMSYAggregatedData, SchemeKey, GenderKey, YearKey } from '../App';
 
 // Props interface for the FiltersAndKPIs component
 interface FiltersAndKPIsProps {
@@ -14,12 +14,9 @@ interface FiltersAndKPIsProps {
   setSelectedYear: (value: YearKey) => void;
   selectedSectorPMMSY: string;
   setSelectedSectorPMMSY: (value: string) => void;
-  selectedActivityPMMSY: string;
-  setSelectedActivityPMMSY: (value: string) => void;
   selectedFinancialYearPMMSY: string;
   setSelectedFinancialYearPMMSY: (value: string) => void;
   pmmsySectors: string[];
-  pmmsyActivityTypes: string[];
   pmmsyFinancialYears: string[];
   globalPMMSYMetrics: PMMSYAggregatedData;
   kpis: { average: number; min: number; max: number } | null;
@@ -62,12 +59,9 @@ const FiltersAndKPIs: React.FC<FiltersAndKPIsProps> = ({
   setSelectedYear,
   selectedSectorPMMSY,
   setSelectedSectorPMMSY,
-  selectedActivityPMMSY,
-  setSelectedActivityPMMSY,
   selectedFinancialYearPMMSY,
   setSelectedFinancialYearPMMSY,
   pmmsySectors,
-  pmmsyActivityTypes,
   pmmsyFinancialYears,
   globalPMMSYMetrics,
   kpis,
@@ -80,7 +74,7 @@ const FiltersAndKPIs: React.FC<FiltersAndKPIsProps> = ({
       <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 mb-2">
         <div
           className={`${
-            selectedScheme === "PMMSY" ? "grid-cols-4" : "grid-cols-3"
+            selectedScheme === "PMMSY" ? "grid-cols-3" : "grid-cols-3"
           } grid gap-4`}
         >
           <div className="space-y-1">
@@ -113,22 +107,6 @@ const FiltersAndKPIs: React.FC<FiltersAndKPIsProps> = ({
                   {pmmsySectors.map((sector) => (
                     <option key={sector} value={sector}>
                       {sector === "all" ? "All Sectors" : sector}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700">
-                  Activity Type
-                </label>
-                <select
-                  value={selectedActivityPMMSY}
-                  onChange={(e) => setSelectedActivityPMMSY(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                >
-                  {pmmsyActivityTypes.map((activity) => (
-                    <option key={activity} value={activity}>
-                      {activity === "all" ? "All Activities" : activity}
                     </option>
                   ))}
                 </select>
