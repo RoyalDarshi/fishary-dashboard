@@ -1,28 +1,15 @@
-import React, { useEffect, useState, useMemo } from "react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import {
-  MapPin,
-  Users,
-  IndianRupee,
-  TrendingUp,
-  X,
-  Wallet,
-  Clock,
-  CheckCircle,
-  PlusCircle,
-} from "lucide-react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import { MapPin, Users, IndianRupee, TrendingUp } from "lucide-react";
 import OpenLayersMap from "./components/OpenLayerMap";
-import pmmsyData from "./data/pmmsyData.json"; // Assuming the Excel data is converted to JSON
+import AreaDetailsPopup from "./components/AreaDetailsPopup";
+import FiltersAndKPIs from "./components/FiltersAndKPIs";
+import {
+  SectorDistributionPieChart,
+  ProjectsBarChart,
+  DistributionPieChart,
+  TopAreasBarChart,
+} from "./components/Charts";
+import pmmsyData from "./data/pmmsyData.json";
 
 // Interface for generic metric values
 interface MetricValues {
@@ -35,9 +22,9 @@ interface MetricValues {
 }
 
 // Type definitions for scheme, gender, and year filters
-type SchemeKey = "all" | "PMMKSS" | "PMMSY" | "KCC" | "NFDP";
-type GenderKey = "all" | "male" | "female" | "transgender";
-type YearKey = "all" | "2021" | "2022" | "2023" | "2024";
+export type SchemeKey = "all" | "PMMKSS" | "PMMSY" | "KCC" | "NFDP";
+export type GenderKey = "all" | "male" | "female" | "transgender";
+export type YearKey = "all" | "2021" | "2022" | "2023" | "2024";
 
 // Interface for area-specific metric data
 interface AreaMetricData {
@@ -62,7 +49,7 @@ interface GeoJSONData {
   features: GeoJSONFeature[];
 }
 
-// New Interface for raw PMMSY data entries
+// Interface for raw PMMSY data entries
 interface PMMSYRawEntry {
   UNIQUE_ID: string;
   "NAME_OF_THE_STATE/UT": string;
@@ -94,8 +81,8 @@ interface PMMSYRawEntry {
   GENDER?: string;
 }
 
-// New Interface for aggregated PMMSY data (per area or global)
-interface PMMSYAggregatedData {
+// Interface for aggregated PMMSY data
+export interface PMMSYAggregatedData {
   totalProjects: number;
   totalInvestment: number;
   fishOutput: number;
@@ -133,43 +120,37 @@ const yearDisplayNames: Record<YearKey, string> = {
 };
 
 const App: React.FC = () => {
-  // State variables for map and filter selections
+  // State variables
   const [polygonData, setPolygonData] = useState<GeoJSONData | null>(null);
-  const [metricData, setMetricData] = useState<Record<
-    string,
-    AreaMetricData
-  > | null>(null);
-  const [selectedMetric, setSelectedMetric] = useState<
-    "beneficiaries" | "funds" | "registrations"
-  >("beneficiaries");
+  const [metricData, setMetricData] = useState<Record<string, AreaMetricData> | null>(null);
+  const [selectedMetric, setSelectedMetric] = useState<"beneficiaries" | "funds" | "registrations">("beneficiaries");
   const [selectedScheme, setSelectedScheme] = useState<SchemeKey>("all");
   const [selectedGender, setSelectedGender] = useState<GenderKey>("all");
   const [selectedYear, setSelectedYear] = useState<YearKey>("all");
   const [error, setError] = useState<string | null>(null);
-  const [selectedAreaDetails, setSelectedAreaDetails] = useState<any | null>(
-    null
-  );
-  const [selectedBarChartCategory, setSelectedBarChartCategory] = useState<
-    "scheme" | "gender" | "year"
-  >("scheme");
-  const [mapView, setMapView] = useState<"state" | "district" | "sub-district">(
-    "state"
-  );
-
-  // New states for PMMSY specific data
-  const [globalPMMSYMetrics, setGlobalPMMSYMetrics] =
-    useState<PMMSYAggregatedData | null>(null);
-  const [pmmsyAreaSpecificMetrics, setPmmsyAreaSpecificMetrics] =
-    useState<Record<string, PMMSYAggregatedData> | null>(null);
-
-  // New states for PMMSY specific filters
+  const [selectedAreaDetails, setSelectedAreaDetails] = useState<any | null>(null);
+  const [selectedBarChartCategory, setSelectedBarChartCategory] = useState<"scheme" | "gender" | "year">("scheme");
+  const [mapView, setMapView] = useState<"state" | "district" | "sub-district">("state");
+  const [globalPMMSYMetrics, setGlobalPMMSYMetrics] = useState<PMMSYAggregatedData>({
+    totalProjects: 0,
+    totalInvestment: 0,
+    fishOutput: 0,
+    totalEmploymentGenerated: 0,
+    directEmploymentMen: 0,
+    directEmploymentWomen: 0,
+    indirectEmploymentMen: 0,
+    indirectEmploymentWomen: 0,
+    projectsByStateUT: [],
+    sectorDistribution: [],
+  });
+  const [pmmsyAreaSpecificMetrics, setPmmsyAreaSpecificMetrics] = useState<Record<string, PMMSYAggregatedData>>({});
   const [selectedSectorPMMSY, setSelectedSectorPMMSY] = useState<string>("all");
-  const [selectedActivityPMMSY, setSelectedActivityPMMSY] =
-    useState<string>("all");
-  const [selectedFinancialYearPMMSY, setSelectedFinancialYearPMMSY] =
-    useState<string>("all");
+  const [selectedActivityPMMSY, setSelectedActivityPMMSY] = useState<string>("all");
+  const [selectedFinancialYearPMMSY, setSelectedFinancialYearPMMSY] = useState<string>("all");
+  const [mockPMMSYData, setMockPMMSYData] = useState<PMMSYRawEntry[]>([]);
+  const [mockNonPMMSYData, setMockNonPMMSYData] = useState<Record<string, AreaMetricData> | null>(null);
 
-  // Memoized list of officer names for mock data
+  // Memoized officer names
   const officerNames = useMemo(() => {
     const names = [
       "Amit Kumar",
@@ -192,10 +173,26 @@ const App: React.FC = () => {
     return officerMap;
   }, [polygonData]);
 
-  // Function to generate mock data for schemes other than PMMSY
-  const generateMockData = (
-    areas: GeoJSONFeature[]
-  ): Record<string, AreaMetricData> => {
+  // Pre-compute shapeIdMap for PMMSY aggregation
+  const shapeIdMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (polygonData) {
+      polygonData.features.forEach((feature) => {
+        const { state_name, district_name, subdistrict_name, level, shapeID } = feature.properties;
+        if (level === "sub-district" && state_name && district_name && subdistrict_name) {
+          map[`${state_name}_${district_name}_${subdistrict_name}`] = shapeID;
+        } else if (level === "district" && state_name && district_name) {
+          map[`${state_name}_${district_name}`] = shapeID;
+        } else if (level === "state" && state_name) {
+          map[state_name] = shapeID;
+        }
+      });
+    }
+    return map;
+  }, [polygonData]);
+
+  // Generate mock data for schemes other than PMMSY
+  const generateMockData = (areas: GeoJSONFeature[]): Record<string, AreaMetricData> => {
     const dataMap: Record<string, AreaMetricData> = {};
     const schemes: SchemeKey[] = ["all", "PMMKSS", "PMMSY", "KCC", "NFDP"];
     const genders: GenderKey[] = ["all", "male", "female", "transgender"];
@@ -204,7 +201,7 @@ const App: React.FC = () => {
     const schemeModifiers: Record<SchemeKey, number> = {
       all: 1,
       PMMKSS: 0.9,
-      PMMSY: 1.1, // PMMSY will have its own data, but mock for general aggregation
+      PMMSY: 1.1,
       KCC: 0.85,
       NFDP: 0.95,
     };
@@ -225,10 +222,7 @@ const App: React.FC = () => {
     areas.forEach((area) => {
       const areaId = area.properties.shapeID;
       const areaData: AreaMetricData = {};
-      const regionalBias =
-        area.properties.level === "state"
-          ? 1.0 + Math.random() * 0.1
-          : 0.9 + Math.random() * 0.2;
+      const regionalBias = area.properties.level === "state" ? 1.0 + Math.random() * 0.1 : 0.9 + Math.random() * 0.2;
 
       schemes.forEach((scheme) => {
         genders.forEach((gender) => {
@@ -239,23 +233,13 @@ const App: React.FC = () => {
             const yearMod = yearModifiers[year];
             const weight = schemeMod * genderMod * yearMod * regionalBias;
 
-            const beneficiaries = Math.floor(
-              weight * (500 + Math.random() * 4500)
-            );
-            const funds = Math.floor(
-              weight * (1000000 + Math.random() * 9000000)
-            );
-            const registrations = Math.floor(
-              weight * (2000 + Math.random() * 8000)
-            );
+            const beneficiaries = Math.floor(weight * (500 + Math.random() * 4500));
+            const funds = Math.floor(weight * (1000000 + Math.random() * 9000000));
+            const registrations = Math.floor(weight * (2000 + Math.random() * 8000));
 
             const funds_used = Math.floor(funds * (0.6 + Math.random() * 0.35));
-            const beneficiaries_last_24h = Math.floor(
-              beneficiaries * (0.01 + Math.random() * 0.05)
-            );
-            const registrations_last_24h = Math.floor(
-              registrations * (0.005 + Math.random() * 0.02)
-            );
+            const beneficiaries_last_24h = Math.floor(beneficiaries * (0.01 + Math.random() * 0.05));
+            const registrations_last_24h = Math.floor(registrations * (0.005 + Math.random() * 0.02));
 
             areaData[key] = {
               beneficiaries,
@@ -273,107 +257,106 @@ const App: React.FC = () => {
     return dataMap;
   };
 
-  // Function to aggregate PMMSY data for map coloring (existing logic)
-  const aggregatePMMSYData = (
-    pmmsyData: any[],
-    geoJsonData: GeoJSONData
-  ): Record<string, AreaMetricData> => {
-    const metricData: Record<string, AreaMetricData> = {};
+  // Optimized PMMSY data generation
+  const generateMockPMMSYData = useCallback((features: GeoJSONFeature[]): PMMSYRawEntry[] => {
+    const sectors = ["Inland", "Marine"];
+    const activities = [
+      "Infrastructure and Post-harvest Management",
+      "Fisheries Management and Regulatory Framework",
+      "Enhancement of Production and Productivity",
+    ];
+    const years = ["2021-22", "2022-23", "2023-24"];
+    const genders = ["male", "female", "transgender"];
+    const names = ["Ram", "Sita", "Mohan", "Rita", "Amit"];
+    const entries: PMMSYRawEntry[] = [];
 
-    const shapeIdMap: Record<string, string> = {};
-    geoJsonData.features.forEach((feature) => {
-      const { state_name, district_name, subdistrict_name, level, shapeID } =
-        feature.properties;
-      if (
-        level === "sub-district" &&
-        state_name &&
-        district_name &&
-        subdistrict_name
-      ) {
-        const key = `${state_name}_${district_name}_${subdistrict_name}`;
-        shapeIdMap[key] = shapeID;
-      } else if (level === "district" && state_name && district_name) {
-        const key = `${state_name}_${district_name}`;
-        shapeIdMap[key] = shapeID;
-      } else if (level === "state" && state_name) {
-        const key = state_name;
-        shapeIdMap[key] = shapeID;
-      }
-    });
+    // Limit the number of entries to a reasonable size to prevent performance issues
+    const entryCount = Math.min(features.length * 2, 1000); // Generate up to 2 entries per feature, capped at 1000
+    const featureCount = features.length;
 
-    pmmsyData.forEach((entry) => {
-      const state = entry["NAME_OF_THE_STATE/UT"];
-      const district = entry["BENEFICIARY_DISTRICT"];
-      const taluk = entry["BENEFICIARY_TALUK_/_MANDAL"];
-      const gender = entry["GENDER"]?.toLowerCase() || "all";
-      const yearMatch = entry["FINANCIAL_YEAR"]?.match(/\d{4}/);
-      const year = yearMatch ? yearMatch[0] : "all";
-      const scheme = "PMMSY";
+    for (let i = 0; i < entryCount; i++) {
+      const feature = features[i % featureCount]; // Distribute entries across features
+      const state = feature.properties.state_name || "Uttarakhand";
+      const district = feature.properties.district_name || "Dehradun";
+      const subdistrict = feature.properties.subdistrict_name || "Raipur";
+      const sector = sectors[Math.floor(Math.random() * sectors.length)];
+      const activity = activities[Math.floor(Math.random() * activities.length)];
+      const year = years[Math.floor(Math.random() * years.length)];
+      const gender = genders[Math.floor(Math.random() * genders.length)];
+      const name = names[Math.floor(Math.random() * names.length)];
 
-      const subDistrictKey = `${state}_${district}_${taluk}`;
-      const subDistrictShapeID = shapeIdMap[subDistrictKey];
-      const districtKey = `${state}_${district}`;
-      const districtShapeID = shapeIdMap[districtKey];
-      const stateShapeID = shapeIdMap[state];
+      const cost = Math.floor(100000 + Math.random() * 1000000);
+      const output = (Math.random() * 50).toFixed(2);
+      const empWomen = Math.floor(Math.random() * 10);
+      const empMen = Math.floor(Math.random() * 15);
 
-      const beneficiaries = 1;
-      const funds =
-        parseFloat(
-          entry[
-            "SUM_OF_TOTAL_COST_(CENTRAL_SHARE+_STATE_SHARE+_BENEFICIARY_CONTRIBUTION)"
-          ]
-        ) || 0;
-      const registrations = 1;
-
-      const updateMetrics = (shapeID: string) => {
-        if (!shapeID) return;
-        const key = `${scheme}_${gender}_${year}`;
-        if (!metricData[shapeID]) metricData[shapeID] = {};
-        if (!metricData[shapeID][key]) {
-          metricData[shapeID][key] = {
-            beneficiaries: 0,
-            funds: 0,
-            registrations: 0,
-          };
-        }
-        metricData[shapeID][key].beneficiaries += beneficiaries;
-        metricData[shapeID][key].funds += funds;
-        metricData[shapeID][key].registrations += registrations;
-      };
-
-      updateMetrics(subDistrictShapeID);
-      updateMetrics(districtShapeID);
-      updateMetrics(stateShapeID);
-    });
-
-    return metricData;
-  };
-
-  // Function to combine mock data with real PMMSY data for map coloring
-  const generateMetricData = (
-    areas: GeoJSONFeature[],
-    pmmsyMetricData: Record<string, AreaMetricData>
-  ): Record<string, AreaMetricData> => {
-    const mockData = generateMockData(areas);
-    const metricData = { ...mockData };
-
-    Object.keys(pmmsyMetricData).forEach((shapeID) => {
-      if (!metricData[shapeID]) metricData[shapeID] = {};
-      Object.keys(pmmsyMetricData[shapeID]).forEach((key) => {
-        // Only overwrite if the key starts with PMMSY_ to ensure mock data for other schemes remains
-        if (key.startsWith("PMMSY_")) {
-          metricData[shapeID][key] = pmmsyMetricData[shapeID][key];
-        }
+      entries.push({
+        UNIQUE_ID: `${i}-${Date.now()}`,
+        "NAME_OF_THE_STATE/UT": state,
+        "FISHERIES_SECTOR_OF_THE_STATE/UT": sector,
+        FINANCIAL_YEAR: year,
+        COMPONENT: "Infrastructure",
+        NAME_OF_THE_ACTIVITY: activity,
+        "NAME_OF_THE_SUB-ACTIVITY": "Sub-Infra",
+        PMMSY_UNIT_COST: cost,
+        TYPE_OF_BENEFICIARY: "Individual",
+        "NAME_OF_THE_BENEFICIARY_/_GROUP_LEADER_/_ENTERPRISE_(OR)_COMPANY_AUTHORISED": name,
+        BENEFICIARY_PHOTO: "",
+        "FATHER’S_(OR)_HUSBAND’S_NAME": "Sharma",
+        BENEFICIARY_DISTRICT: district,
+        "BENEFICIARY_TALUK_/_MANDAL": subdistrict,
+        BENEFICIARY_VILLAGE: "Test Village",
+        PIN_CODE: 123456,
+        "ADDRESS_OF_THE_BENEFICIARY_/_GROUP_LEADER_/_ENTREPRENEUR_/_ENTERPRISE_FIRM": "Test Address",
+        "SUM_OF_TOTAL_COST_(CENTRAL_SHARE+_STATE_SHARE+_BENEFICIARY_CONTRIBUTION)": cost,
+        "SUM_OF_ADDITIONAL_STATE_SHARE_RELEASED_(IN_RS.)": Math.floor(cost * 0.1),
+        OUTPUT: output,
+        TOTAL_OUTPUT: output,
+        "TOTAL_EMPLOYMENT_GENERATED_(WOMEN)": empWomen.toString(),
+        "TOTAL_EMPLOYMENT_GENERATED_(MEN)": empMen.toString(),
+        "DIRECT_EMPLOYMENT_GENERATED_(WOMEN)": Math.floor(empWomen * 0.6).toString(),
+        "DIRECT_EMPLOYMENT_GENERATED_(MEN)": Math.floor(empMen * 0.6).toString(),
+        "INDIRECT_EMPLOYMENT_GENERATED_(WOMEN)": Math.floor(empWomen * 0.4).toString(),
+        "INDIRECT_EMPLOYMENT_GENERATED_(MEN)": Math.floor(empMen * 0.4).toString(),
+        GENDER: gender,
       });
+    }
+
+    return entries;
+  }, []);
+
+  // Generate mock PMMSY data only once when polygonData is set
+  useEffect(() => {
+    if (polygonData && mockPMMSYData.length === 0) {
+      const entries = generateMockPMMSYData(polygonData.features);
+      setMockPMMSYData(entries);
+    }
+  }, [polygonData, mockPMMSYData.length, generateMockPMMSYData]);
+
+  // Generate mock non-PMMSY data only once when polygonData is set
+  useEffect(() => {
+    if (polygonData && !mockNonPMMSYData) {
+      const data = generateMockData(polygonData.features);
+      setMockNonPMMSYData(data);
+    }
+  }, [polygonData, mockNonPMMSYData]);
+
+  // Pre-index PMMSY data for faster filtering
+  const pmmsyDataIndex = useMemo(() => {
+    const index: Record<string, PMMSYRawEntry[]> = {};
+    mockPMMSYData.forEach((entry) => {
+      const sector = entry["FISHERIES_SECTOR_OF_THE_STATE/UT"]?.toLowerCase() || "unknown";
+      const activity = entry["NAME_OF_THE_ACTIVITY"]?.toLowerCase() || "unknown";
+      const year = entry["FINANCIAL_YEAR"]?.toLowerCase() || "unknown";
+      const key = `${sector}_${activity}_${year}`;
+      if (!index[key]) index[key] = [];
+      index[key].push(entry);
     });
+    return index;
+  }, [mockPMMSYData]);
 
-    return metricData;
-  };
-
-  // New function to aggregate PMMSY data for the specific dashboard view
-  const aggregatePMMSYDashboardData = (
-    rawData: PMMSYRawEntry[],
-    geoJsonData: GeoJSONData,
+  // Optimized PMMSY dashboard data aggregation
+  const aggregatePMMSYDashboardData = useCallback((
     selectedSector: string,
     selectedActivity: string,
     selectedFinancialYear: string
@@ -395,188 +378,137 @@ const App: React.FC = () => {
     };
 
     const areaSpecificMetrics: Record<string, PMMSYAggregatedData> = {};
+    const projectsByStateUTMap = new Map<string, number>();
+    const sectorDistributionMap = new Map<string, number>();
 
-    const projectsByStateUTMap: Map<string, number> = new Map();
-    const sectorDistributionMap: Map<string, number> = new Map();
+    // Construct index key for filtering
+    const sectorKey = selectedSector === "all" ? ".*" : selectedSector.toLowerCase();
+    const activityKey = selectedActivity === "all" ? ".*" : selectedActivity.toLowerCase();
+    const yearKey = selectedFinancialYear === "all" ? ".*" : selectedFinancialYear.toLowerCase();
+    const indexKeyPattern = new RegExp(`^${sectorKey}_${activityKey}_${yearKey}$`);
 
-    // Helper to find shapeID based on state/district/sub-district names
-    const getShapeIDForArea = (
-      stateName: string,
-      districtName?: string,
-      subdistrictName?: string
-    ): string | undefined => {
-      let foundFeature: GeoJSONFeature | undefined;
+    // Aggregate data from indexed entries
+    Object.keys(pmmsyDataIndex).forEach((key) => {
+      if (!indexKeyPattern.test(key)) return;
+      const entries = pmmsyDataIndex[key];
 
-      if (stateName && districtName && subdistrictName) {
-        foundFeature = geoJsonData.features.find(
-          (f) =>
-            f.properties.level === "sub-district" &&
-            f.properties.state_name?.toLowerCase() ===
-              stateName.toLowerCase() &&
-            f.properties.district_name?.toLowerCase() ===
-              districtName.toLowerCase() &&
-            f.properties.subdistrict_name?.toLowerCase() ===
-              subdistrictName.toLowerCase()
-        );
-      }
-      if (!foundFeature && stateName && districtName) {
-        foundFeature = geoJsonData.features.find(
-          (f) =>
-            f.properties.level === "district" &&
-            f.properties.state_name?.toLowerCase() ===
-              stateName.toLowerCase() &&
-            f.properties.district_name?.toLowerCase() ===
-              districtName.toLowerCase()
-        );
-      }
-      if (!foundFeature && stateName) {
-        foundFeature = geoJsonData.features.find(
-          (f) =>
-            f.properties.level === "state" &&
-            f.properties.state_name?.toLowerCase() === stateName.toLowerCase()
-        );
-      }
-      return foundFeature?.properties.shapeID;
-    };
+      entries.forEach((entry) => {
+        const investment = parseFloat(entry["SUM_OF_TOTAL_COST_(CENTRAL_SHARE+_STATE_SHARE+_BENEFICIARY_CONTRIBUTION)"]?.toString()) || 0;
+        const fishOutput = parseFloat(entry["TOTAL_OUTPUT"]?.toString()) || 0;
+        const totalEmpWomen = parseInt(entry["TOTAL_EMPLOYMENT_GENERATED_(WOMEN)"]?.toString()) || 0;
+        const totalEmpMen = parseInt(entry["TOTAL_EMPLOYMENT_GENERATED_(MEN)"]?.toString()) || 0;
+        const directEmpWomen = parseInt(entry["DIRECT_EMPLOYMENT_GENERATED_(WOMEN)"]?.toString()) || 0;
+        const directEmpMen = parseInt(entry["DIRECT_EMPLOYMENT_GENERATED_(MEN)"]?.toString()) || 0;
+        const indirectEmpWomen = parseInt(entry["INDIRECT_EMPLOYMENT_GENERATED_(WOMEN)"]?.toString()) || 0;
+        const indirectEmpMen = parseInt(entry["INDIRECT_EMPLOYMENT_GENERATED_(MEN)"]?.toString()) || 0;
 
-    // Filter raw data based on selected filters
-    const filteredData = rawData.filter((entry) => {
-      const matchesSector =
-        selectedSector === "all" ||
-        entry["FISHERIES_SECTOR_OF_THE_STATE/UT"] === selectedSector;
-      const matchesActivity =
-        selectedActivity === "all" ||
-        entry["NAME_OF_THE_ACTIVITY"] === selectedActivity;
-      const matchesFinancialYear =
-        selectedFinancialYear === "all" ||
-        entry["FINANCIAL_YEAR"] === selectedFinancialYear;
-      return matchesSector && matchesActivity && matchesFinancialYear;
-    });
+        // Global aggregation
+        globalMetrics.totalProjects += 1;
+        globalMetrics.totalInvestment += investment;
+        globalMetrics.fishOutput += fishOutput;
+        globalMetrics.totalEmploymentGenerated += totalEmpWomen + totalEmpMen;
+        globalMetrics.directEmploymentWomen += directEmpWomen;
+        globalMetrics.directEmploymentMen += directEmpMen;
+        globalMetrics.indirectEmploymentWomen += indirectEmpWomen;
+        globalMetrics.indirectEmploymentMen += indirectEmpMen;
 
-    filteredData.forEach((entry) => {
-      const investment =
-        parseFloat(
-          entry[
-            "SUM_OF_TOTAL_COST_(CENTRAL_SHARE+_STATE_SHARE+_BENEFICIARY_CONTRIBUTION)"
-          ]?.toString()
-        ) || 0;
-      const fishOutput = parseFloat(entry["TOTAL_OUTPUT"]?.toString()) || 0;
-      const totalEmpWomen =
-        parseInt(entry["TOTAL_EMPLOYMENT_GENERATED_(WOMEN)"]?.toString()) || 0;
-      const totalEmpMen =
-        parseInt(entry["TOTAL_EMPLOYMENT_GENERATED_(MEN)"]?.toString()) || 0;
-      const directEmpWomen =
-        parseInt(entry["DIRECT_EMPLOYMENT_GENERATED_(WOMEN)"]?.toString()) || 0;
-      const directEmpMen =
-        parseInt(entry["DIRECT_EMPLOYMENT_GENERATED_(MEN)"]?.toString()) || 0;
-      const indirectEmpWomen =
-        parseInt(entry["INDIRECT_EMPLOYMENT_GENERATED_(WOMEN)"]?.toString()) ||
-        0;
-      const indirectEmpMen =
-        parseInt(entry["INDIRECT_EMPLOYMENT_GENERATED_(MEN)"]?.toString()) || 0;
+        // Aggregation for Projects by State/UT
+        const stateName = entry["NAME_OF_THE_STATE/UT"];
+        projectsByStateUTMap.set(stateName, (projectsByStateUTMap.get(stateName) || 0) + 1);
 
-      // Global aggregation
-      globalMetrics.totalProjects += 1;
-      globalMetrics.totalInvestment += investment;
-      globalMetrics.fishOutput += fishOutput;
-      globalMetrics.totalEmploymentGenerated += totalEmpWomen + totalEmpMen;
-      globalMetrics.directEmploymentWomen += directEmpWomen;
-      globalMetrics.directEmploymentMen += directEmpMen;
-      globalMetrics.indirectEmploymentWomen += indirectEmpWomen;
-      globalMetrics.indirectEmploymentMen += indirectEmpMen;
+        // Aggregation for Sector Distribution
+        const sector = entry["FISHERIES_SECTOR_OF_THE_STATE/UT"];
+        sectorDistributionMap.set(sector, (sectorDistributionMap.get(sector) || 0) + 1);
 
-      // Aggregation for Projects by State/UT
-      const stateName = entry["NAME_OF_THE_STATE/UT"];
-      projectsByStateUTMap.set(
-        stateName,
-        (projectsByStateUTMap.get(stateName) || 0) + 1
-      );
-
-      // Aggregation for Sector Distribution
-      const sector = entry["FISHERIES_SECTOR_OF_THE_STATE/UT"];
-      sectorDistributionMap.set(
-        sector,
-        (sectorDistributionMap.get(sector) || 0) + 1
-      );
-
-      // Area-specific aggregation for PMMSY details panel
-      const areaShapeID = getShapeIDForArea(
-        stateName,
-        entry["BENEFICIARY_DISTRICT"],
-        entry["BENEFICIARY_TALUK_/_MANDAL"]
-      );
-      if (areaShapeID) {
-        if (!areaSpecificMetrics[areaShapeID]) {
-          areaSpecificMetrics[areaShapeID] = {
-            totalProjects: 0,
-            totalInvestment: 0,
-            fishOutput: 0,
-            totalEmploymentGenerated: 0,
-            directEmploymentMen: 0,
-            directEmploymentWomen: 0,
-            indirectEmploymentMen: 0,
-            indirectEmploymentWomen: 0,
-            projectsByStateUT: [],
-            sectorDistribution: [],
-          };
+        // Area-specific aggregation
+        const areaShapeID =
+          shapeIdMap[`${stateName}_${entry["BENEFICIARY_DISTRICT"]}_${entry["BENEFICIARY_TALUK_/_MANDAL"]}`] ||
+          shapeIdMap[`${stateName}_${entry["BENEFICIARY_DISTRICT"]}`] ||
+          shapeIdMap[stateName];
+        if (areaShapeID) {
+          if (!areaSpecificMetrics[areaShapeID]) {
+            areaSpecificMetrics[areaShapeID] = {
+              totalProjects: 0,
+              totalInvestment: 0,
+              fishOutput: 0,
+              totalEmploymentGenerated: 0,
+              directEmploymentMen: 0,
+              directEmploymentWomen: 0,
+              indirectEmploymentMen: 0,
+              indirectEmploymentWomen: 0,
+              projectsByStateUT: [],
+              sectorDistribution: [],
+            };
+          }
+          areaSpecificMetrics[areaShapeID].totalProjects += 1;
+          areaSpecificMetrics[areaShapeID].totalInvestment += investment;
+          areaSpecificMetrics[areaShapeID].fishOutput += fishOutput;
+          areaSpecificMetrics[areaShapeID].totalEmploymentGenerated += totalEmpWomen + totalEmpMen;
+          areaSpecificMetrics[areaShapeID].directEmploymentWomen += directEmpWomen;
+          areaSpecificMetrics[areaShapeID].directEmploymentMen += directEmpMen;
+          areaSpecificMetrics[areaShapeID].indirectEmploymentWomen += indirectEmpWomen;
+          areaSpecificMetrics[areaShapeID].indirectEmploymentMen += indirectEmpMen;
         }
-        areaSpecificMetrics[areaShapeID].totalProjects += 1;
-        areaSpecificMetrics[areaShapeID].totalInvestment += investment;
-        areaSpecificMetrics[areaShapeID].fishOutput += fishOutput;
-        areaSpecificMetrics[areaShapeID].totalEmploymentGenerated +=
-          totalEmpWomen + totalEmpMen;
-        areaSpecificMetrics[areaShapeID].directEmploymentWomen +=
-          directEmpWomen;
-        areaSpecificMetrics[areaShapeID].directEmploymentMen += directEmpMen;
-        areaSpecificMetrics[areaShapeID].indirectEmploymentWomen +=
-          indirectEmpWomen;
-        areaSpecificMetrics[areaShapeID].indirectEmploymentMen +=
-          indirectEmpMen;
-      }
+      });
     });
 
-    globalMetrics.projectsByStateUT = Array.from(
-      projectsByStateUTMap.entries()
-    ).map(([name, value]) => ({ name, value }));
-    globalMetrics.sectorDistribution = Array.from(
-      sectorDistributionMap.entries()
-    ).map(([name, value]) => ({ name, value }));
+    globalMetrics.projectsByStateUT = Array.from(projectsByStateUTMap.entries()).map(([name, value]) => ({
+      name,
+      value,
+    }));
+    globalMetrics.sectorDistribution = Array.from(sectorDistributionMap.entries()).map(([name, value]) => ({
+      name,
+      value,
+    }));
 
     return { global: globalMetrics, areaSpecific: areaSpecificMetrics };
+  }, [pmmsyDataIndex, shapeIdMap]);
+
+  // Debounced state updates for PMMSY filters
+  const debounce = (func: (...args: any[]) => void, wait: number) => {
+    let timeout: NodeJS.Timeout;
+    return (...args: any[]) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
   };
 
-  // Extract unique filter options from PMMSY data
+  const debouncedSetSelectedSectorPMMSY = useCallback(debounce(setSelectedSectorPMMSY, 300), []);
+  const debouncedSetSelectedActivityPMMSY = useCallback(debounce(setSelectedActivityPMMSY, 300), []);
+  const debouncedSetSelectedFinancialYearPMMSY = useCallback(debounce(setSelectedFinancialYearPMMSY, 300), []);
+
+  // PMMSY filter options
   const pmmsySectors = useMemo(() => {
     const sectors = new Set<string>();
-    pmmsyData.forEach((entry: PMMSYRawEntry) => {
+    mockPMMSYData.forEach((entry: PMMSYRawEntry) => {
       if (entry["FISHERIES_SECTOR_OF_THE_STATE/UT"]) {
         sectors.add(entry["FISHERIES_SECTOR_OF_THE_STATE/UT"]);
       }
     });
     return ["all", ...Array.from(sectors).sort()];
-  }, [pmmsyData]);
+  }, [mockPMMSYData]);
 
   const pmmsyActivityTypes = useMemo(() => {
     const activities = new Set<string>();
-    pmmsyData.forEach((entry: PMMSYRawEntry) => {
+    mockPMMSYData.forEach((entry: PMMSYRawEntry) => {
       if (entry["NAME_OF_THE_ACTIVITY"]) {
         activities.add(entry["NAME_OF_THE_ACTIVITY"]);
       }
     });
     return ["all", ...Array.from(activities).sort()];
-  }, [pmmsyData]);
+  }, [mockPMMSYData]);
 
   const pmmsyFinancialYears = useMemo(() => {
     const years = new Set<string>();
-    pmmsyData.forEach((entry: PMMSYRawEntry) => {
+    mockPMMSYData.forEach((entry: PMMSYRawEntry) => {
       if (entry["FINANCIAL_YEAR"]) {
         years.add(entry["FINANCIAL_YEAR"]);
       }
     });
     return ["all", ...Array.from(years).sort()];
-  }, [pmmsyData]);
+  }, [mockPMMSYData]);
 
-  // Effect hook to fetch GeoJSON and aggregate data on component mount or filter change
+  // Fetch GeoJSON and aggregate data
   useEffect(() => {
     fetch("/indianmap.geojson")
       .then((res) => {
@@ -594,46 +526,39 @@ const App: React.FC = () => {
         };
         setPolygonData(filteredGeoJsonData);
 
-        // Aggregate PMMSY data for map coloring (existing logic)
-        const pmmsyMetricDataForMap = aggregatePMMSYData(
-          pmmsyData,
-          filteredGeoJsonData
-        );
-        const dataMap = generateMetricData(
-          filteredFeatures,
-          pmmsyMetricDataForMap
-        );
-        setMetricData(dataMap);
+        // Set the metric data to the generated mock data
+        setMetricData(mockNonPMMSYData);
 
-        // Aggregate PMMSY data for the specific dashboard view, with new filters
-        const { global, areaSpecific } = aggregatePMMSYDashboardData(
-          pmmsyData as PMMSYRawEntry[],
-          filteredGeoJsonData,
-          selectedSectorPMMSY,
-          selectedActivityPMMSY,
-          selectedFinancialYearPMMSY
-        );
-        setGlobalPMMSYMetrics(global);
-        setPmmsyAreaSpecificMetrics(areaSpecific);
+        // Aggregate PMMSY dashboard data only if PMMSY is selected
+        if (selectedScheme === "PMMSY") {
+          const { global, areaSpecific } = aggregatePMMSYDashboardData(
+            selectedSectorPMMSY,
+            selectedActivityPMMSY,
+            selectedFinancialYearPMMSY
+          );
+          setGlobalPMMSYMetrics(global);
+          setPmmsyAreaSpecificMetrics(areaSpecific);
+        }
       })
       .catch((err) => {
         console.error("GeoJSON load error:", err);
         setError(err.message);
       });
-  }, [selectedSectorPMMSY, selectedActivityPMMSY, selectedFinancialYearPMMSY]); // Re-run effect when PMMSY filters change
+  }, [
+    selectedScheme,
+    selectedSectorPMMSY,
+    selectedActivityPMMSY,
+    selectedFinancialYearPMMSY,
+    aggregatePMMSYDashboardData,
+    mockNonPMMSYData,
+  ]);
 
-  // Memoized filtered GeoJSON data based on map view
+  // Filtered GeoJSON data
   const filteredGeoJsonData = useMemo(() => {
     if (!polygonData) return null;
-    const stateFeatures = polygonData.features.filter(
-      (f) => f.properties.level === "state"
-    );
-    const districtFeatures = polygonData.features.filter(
-      (f) => f.properties.level === "district"
-    );
-    const subDistrictFeatures = polygonData.features.filter(
-      (f) => f.properties.level === "sub-district"
-    );
+    const stateFeatures = polygonData.features.filter((f) => f.properties.level === "state");
+    const districtFeatures = polygonData.features.filter((f) => f.properties.level === "district");
+    const subDistrictFeatures = polygonData.features.filter((f) => f.properties.level === "sub-district");
 
     if (mapView === "state") {
       return { ...polygonData, features: stateFeatures };
@@ -645,21 +570,17 @@ const App: React.FC = () => {
     } else {
       return {
         ...polygonData,
-        features: [
-          ...subDistrictFeatures,
-          ...districtFeatures,
-          ...stateFeatures,
-        ],
+        features: [...subDistrictFeatures, ...districtFeatures, ...stateFeatures],
       };
     }
   }, [polygonData, mapView]);
 
-  // Memoized demographic key for general metric data
+  // Memoized demographic key
   const demographicKey = useMemo(() => {
     return `${selectedScheme}_${selectedGender}_${selectedYear}`;
   }, [selectedScheme, selectedGender, selectedYear]);
 
-  // Helper function to format large numbers
+  // Format number
   const formatNumber = (num: number): string => {
     if (num >= 10000000) {
       return (num / 10000000).toFixed(2) + " Cr";
@@ -670,7 +591,7 @@ const App: React.FC = () => {
     return num.toLocaleString();
   };
 
-  // Memoized KPIs for generic metrics
+  // KPIs for generic metrics
   const kpis = useMemo(() => {
     if (!metricData || !filteredGeoJsonData) return null;
     const relevantFeatureIds = filteredGeoJsonData.features
@@ -692,15 +613,9 @@ const App: React.FC = () => {
     const min = Math.min(...values);
     const max = Math.max(...values);
     return { average, min, max };
-  }, [
-    metricData,
-    selectedMetric,
-    demographicKey,
-    filteredGeoJsonData,
-    mapView,
-  ]);
+  }, [metricData, selectedMetric, demographicKey, filteredGeoJsonData, mapView]);
 
-  // Function to determine color based on metric and value
+  // Color function
   const getColor = (metric: string, value: number | string): string => {
     const categoryColors: Record<string, string> = {
       PMMKSS: "#6366f1",
@@ -714,12 +629,11 @@ const App: React.FC = () => {
       2022: "#a78bfa",
       2023: "#8b5cf6",
       2024: "#6366f1",
-      Inland: "#10b981", // For PMMSY sector distribution
-      Marine: "#6366f1", // For PMMSY sector distribution
+      Inland: "#10b981",
+      Marine: "#6366f1",
     };
 
-    if (typeof value === "string" && categoryColors[value])
-      return categoryColors[value];
+    if (typeof value === "string" && categoryColors[value]) return categoryColors[value];
 
     if (metric === "beneficiaries") {
       if (typeof value === "number" && value >= 4000) return "#6366f1";
@@ -740,19 +654,18 @@ const App: React.FC = () => {
     return "#6b7280";
   };
 
-  // Function to format metric values for display
+  // Format metric value
   const formatMetricValue = (metric: string, value: number): string => {
-    if (
-      metric === "beneficiaries_last_24h" ||
-      metric === "registrations_last_24h"
-    )
+    if (metric === "beneficiaries_last_24h" || metric === "registrations_last_24h") {
       return value.toLocaleString();
-    if (metric === "funds" || metric === "funds_used")
+    }
+    if (metric === "funds" || metric === "funds_used") {
       return `₹${formatNumber(value)}`;
+    }
     return formatNumber(value);
   };
 
-  // Function to get display name for a metric
+  // Metric display name
   const getMetricDisplayName = (metric: string): string => {
     if (metric === "beneficiaries") return "Beneficiaries";
     if (metric === "funds") return "Funds Allocated";
@@ -760,28 +673,26 @@ const App: React.FC = () => {
     return "Unknown Metric";
   };
 
-  // Function to get icon for a metric
+  // Metric icon
   const getMetricIcon = (metric: string) => {
     if (metric === "beneficiaries") return <Users className="w-5 h-5" />;
     if (metric === "funds") return <IndianRupee className="w-5 h-5" />;
-    if (metric === "registrations") return <PlusCircle className="w-5 h-5" />;
+    if (metric === "registrations") return <TrendingUp className="w-5 h-5" />;
     return <TrendingUp className="w-5 h-5" />;
   };
 
-  // Function to get full metric name including filters
+  // Full metric name
   const getFullMetricName = () => {
     const metricName = getMetricDisplayName(selectedMetric);
     const filters = [];
-    if (selectedScheme !== "all")
-      filters.push(schemeDisplayNames[selectedScheme]);
-    if (selectedGender !== "all")
-      filters.push(genderDisplayNames[selectedGender]);
+    if (selectedScheme !== "all") filters.push(schemeDisplayNames[selectedScheme]);
+    if (selectedGender !== "all") filters.push(genderDisplayNames[selectedGender]);
     if (selectedYear !== "all") filters.push(yearDisplayNames[selectedYear]);
     const demographicName = filters.length > 0 ? filters.join(", ") : "Overall";
     return `${metricName} (${demographicName})`;
   };
 
-  // Brackets for pie chart legend (generic metrics)
+  // Brackets for pie chart legend
   const brackets = {
     beneficiaries: [
       { label: "<2K", min: 0, max: 2000, color: "#c4b5fd" },
@@ -803,10 +714,9 @@ const App: React.FC = () => {
     ],
   };
 
-  // Memoized data for generic pie chart
+  // Pie chart data
   const pieData = useMemo(() => {
-    if (!metricData || !filteredGeoJsonData || selectedScheme === "PMMSY")
-      return []; // Exclude if PMMSY is selected
+    if (!metricData || !filteredGeoJsonData || selectedScheme === "PMMSY") return [];
     const currentBrackets = brackets[selectedMetric];
     const counts = currentBrackets.map((bracket) => ({ ...bracket, count: 0 }));
 
@@ -821,9 +731,7 @@ const App: React.FC = () => {
         const id = feature.properties.shapeID;
         const value = metricData[id]?.[demographicKey]?.[selectedMetric];
         if (value !== undefined) {
-          const bracket = currentBrackets.find(
-            (b) => value >= b.min && (b.max === Infinity ? true : value < b.max)
-          );
+          const bracket = currentBrackets.find((b) => value >= b.min && (b.max === Infinity ? true : value < b.max));
           if (bracket) counts[currentBrackets.indexOf(bracket)].count++;
         }
       });
@@ -833,33 +741,21 @@ const App: React.FC = () => {
       value: c.count,
       color: c.color,
     }));
-  }, [
-    metricData,
-    filteredGeoJsonData,
-    selectedMetric,
-    demographicKey,
-    mapView,
-    selectedScheme,
-  ]);
+  }, [metricData, filteredGeoJsonData, selectedMetric, demographicKey, mapView, selectedScheme]);
 
-  // Memoized overall metric data for sorting (generic bar chart)
+  // Bar chart data
   const overallMetricDataForSorting = useMemo(() => {
     if (!metricData || !polygonData || selectedScheme === "PMMSY") return {};
     const overallKey = `all_all_all`;
     const data: Record<string, number> = {};
     polygonData.features.forEach((feature) => {
-      data[feature.properties.shapeID] =
-        metricData[feature.properties.shapeID]?.[overallKey]?.[
-          selectedMetric
-        ] ?? 0;
+      data[feature.properties.shapeID] = metricData[feature.properties.shapeID]?.[overallKey]?.[selectedMetric] ?? 0;
     });
     return data;
   }, [metricData, polygonData, selectedMetric, selectedScheme]);
 
-  // Memoized data for generic bar chart
   const barData = useMemo(() => {
-    if (!metricData || !polygonData || selectedScheme === "PMMSY")
-      return { data: [], keys: [], displayNamesMap: {} };
+    if (!metricData || !polygonData || selectedScheme === "PMMSY") return { data: [], keys: [], displayNamesMap: {} };
 
     const featuresForBarChart = polygonData.features.filter(
       (f) =>
@@ -872,8 +768,7 @@ const App: React.FC = () => {
       .map((feature) => ({
         id: feature.properties.shapeID,
         name: feature.properties.shapeName || "Unknown Area",
-        overallValue:
-          overallMetricDataForSorting[feature.properties.shapeID] || 0,
+        overallValue: overallMetricDataForSorting[feature.properties.shapeID] || 0,
       }))
       .sort((a, b) => b.overallValue - a.overallValue)
       .slice(0, 10);
@@ -885,20 +780,17 @@ const App: React.FC = () => {
     switch (selectedBarChartCategory) {
       case "scheme":
         keys = ["PMMKSS", "PMMSY", "KCC", "NFDP"];
-        getDemographicKey = (areaId, key) =>
-          `${key}_${selectedGender}_${selectedYear}`;
+        getDemographicKey = (areaId, key) => `${key}_${selectedGender}_${selectedYear}`;
         displayNamesMap = schemeDisplayNames;
         break;
       case "gender":
         keys = ["male", "female", "transgender"];
-        getDemographicKey = (areaId, key) =>
-          `${selectedScheme}_${key}_${selectedYear}`;
+        getDemographicKey = (areaId, key) => `${selectedScheme}_${key}_${selectedYear}`;
         displayNamesMap = genderDisplayNames;
         break;
       case "year":
         keys = ["2021", "2022", "2023", "2024"];
-        getDemographicKey = (areaId, key) =>
-          `${selectedScheme}_${selectedGender}_${key}`;
+        getDemographicKey = (areaId, key) => `${selectedScheme}_${selectedGender}_${key}`;
         displayNamesMap = yearDisplayNames;
         break;
       default:
@@ -928,55 +820,25 @@ const App: React.FC = () => {
     mapView,
   ]);
 
-  const {
-    data: barChartData,
-    keys: barChartKeys,
-    displayNamesMap: barChartDisplayNamesMap,
-  } = barData;
+  const { data: barChartData, keys: barChartKeys, displayNamesMap: barChartDisplayNamesMap } = barData;
 
-  // Custom tooltip for generic bar chart
-  const CustomBarTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white border border-gray-300 rounded p-2 shadow text-xs">
-          <p className="font-semibold">{label}</p>
-          {payload.map((entry: any, index: number) => {
-            const categoryKey = entry.dataKey;
-            const displayName =
-              barChartDisplayNamesMap[categoryKey] || categoryKey;
-            return (
-              <div key={`tooltip-${index}`} className="flex items-center gap-2">
-                <span
-                  className="inline-block w-3 h-3 rounded-full"
-                  style={{
-                    backgroundColor:
-                      getColor(selectedMetric, categoryKey) || "#ccc",
-                  }}
-                />
-                <span>{displayName}</span>:
-                <span className="font-medium">
-                  {formatMetricValue(selectedMetric, entry.value)}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Handler for area clicks on the map
+  // Handle area click
   const handleAreaClick = (areaDetails: any) => {
-    // If PMMSY scheme is selected, populate with PMMSY specific metrics for the clicked area
     if (selectedScheme === "PMMSY" && pmmsyAreaSpecificMetrics) {
-      const pmmsySpecificData = pmmsyAreaSpecificMetrics[areaDetails.id];
-      setSelectedAreaDetails({
-        ...areaDetails,
-        pmmsyMetrics: pmmsySpecificData, // Attach PMMSY specific metrics
-      });
+      const pmmsySpecificData = pmmsyAreaSpecificMetrics[areaDetails.id] || {
+        totalProjects: 0,
+        totalInvestment: 0,
+        fishOutput: 0,
+        totalEmploymentGenerated: 0,
+        directEmploymentMen: 0,
+        directEmploymentWomen: 0,
+        indirectEmploymentMen: 0,
+        indirectEmploymentWomen: 0,
+        projectsByStateUT: [],
+        sectorDistribution: [],
+      };
+      setSelectedAreaDetails({ ...areaDetails, pmmsyMetrics: pmmsySpecificData });
     } else {
-      // Otherwise, use the generic metric data
       setSelectedAreaDetails(areaDetails);
     }
   };
@@ -986,29 +848,20 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-lg border-l-4 border-red-500">
-          <h2 className="text-xl font-bold text-red-600 mb-2">
-            Error Loading Dashboard
-          </h2>
+          <h2 className="text-xl font-bold text-red-600 mb-2">Error Loading Dashboard</h2>
           <p className="text-red-800">{error}</p>
         </div>
       </div>
     );
   }
 
-  if (
-    !polygonData ||
-    !metricData ||
-    (selectedScheme === "PMMSY" &&
-      (!globalPMMSYMetrics || !pmmsyAreaSpecificMetrics))
-  ) {
+  if (!polygonData || !metricData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-lg">
           <div className="flex items-center space-x-3">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="text-lg font-medium text-gray-900">
-              Loading dashboard...
-            </p>
+            <p className="text-lg font-medium text-gray-900">Loading dashboard...</p>
           </div>
         </div>
       </div>
@@ -1030,25 +883,16 @@ const App: React.FC = () => {
               </h1>
             </div>
             <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-x-2">
-              {/* Metric Selector (hidden if PMMSY is selected, as PMMSY has fixed metrics) */}
               {selectedScheme !== "PMMSY" && (
                 <>
-                  <label
-                    htmlFor="metric-select"
-                    className="font-semibold text-xs sm:text-sm"
-                  >
+                  <label htmlFor="metric-select" className="font-semibold text-xs sm:text-sm">
                     Metric
                   </label>
                   <select
                     id="metric-select"
                     value={selectedMetric}
                     onChange={(e) =>
-                      setSelectedMetric(
-                        e.target.value as
-                          | "beneficiaries"
-                          | "funds"
-                          | "registrations"
-                      )
+                      setSelectedMetric(e.target.value as "beneficiaries" | "funds" | "registrations")
                     }
                     className="p-1 bg-gray-50 border border-gray-300 rounded-md text-xs sm:text-sm"
                   >
@@ -1096,232 +940,30 @@ const App: React.FC = () => {
       </header>
 
       <main className="mx-auto px-2 py-2">
-        {/* Filters */}
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 mb-2">
-          <div className={`grid grid-cols-${selectedScheme === "PMMSY"?4:3} gap-4`}>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">
-                Scheme
-              </label>
-              <select
-                value={selectedScheme}
-                onChange={(e) => setSelectedScheme(e.target.value as SchemeKey)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-              >
-                {Object.entries(schemeDisplayNames).map(([key, display]) => (
-                  <option key={key} value={key}>
-                    {display}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {/* Conditional PMMSY Filters or existing Gender/Year filters */}
-            {selectedScheme === "PMMSY" ? (
-              <>
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Sector
-                  </label>
-                  <select
-                    value={selectedSectorPMMSY}
-                    onChange={(e) => setSelectedSectorPMMSY(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  >
-                    {pmmsySectors.map((sector) => (
-                      <option key={sector} value={sector}>
-                        {sector === "all" ? "All Sectors" : sector}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Activity Type
-                  </label>
-                  <select
-                    value={selectedActivityPMMSY}
-                    onChange={(e) => setSelectedActivityPMMSY(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  >
-                    {pmmsyActivityTypes.map((activity) => (
-                      <option key={activity} value={activity}>
-                        {activity === "all" ? "All Activities" : activity}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {/* Add Financial Year filter for PMMSY */}
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Financial Year
-                  </label>
-                  <select
-                    value={selectedFinancialYearPMMSY}
-                    onChange={(e) =>
-                      setSelectedFinancialYearPMMSY(e.target.value)
-                    }
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  >
-                    {pmmsyFinancialYears.map((year) => (
-                      <option key={year} value={year}>
-                        {year === "all" ? "All Years" : year}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Gender
-                  </label>
-                  <select
-                    value={selectedGender}
-                    onChange={(e) =>
-                      setSelectedGender(e.target.value as GenderKey)
-                    }
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  >
-                    {Object.entries(genderDisplayNames).map(
-                      ([key, display]) => (
-                        <option key={key} value={key}>
-                          {display}
-                        </option>
-                      )
-                    )}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Year
-                  </label>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value as YearKey)}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  >
-                    {Object.entries(yearDisplayNames).map(([key, display]) => (
-                      <option key={key} value={key}>
-                        {display}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Conditional KPIs: PMMSY specific or generic */}
-        {selectedScheme === "PMMSY" && globalPMMSYMetrics ? (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
-            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-6 hover:shadow-xl transition-shadow">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4 ml-8">
-                  <p className="text-xl font-medium text-gray-600">
-                    Total Projects
-                  </p>
-                  <p className="text-4xl font-bold text-blue-600">
-                    {globalPMMSYMetrics.totalProjects.toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl">
-                  <MapPin className="w-5 h-5" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-6 hover:shadow-xl transition-shadow">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4 ml-8">
-                  <p className="text-xl font-medium text-gray-600">
-                    Total Investment
-                  </p>
-                  <p className="text-4xl font-bold text-green-600">
-                    ₹{formatNumber(globalPMMSYMetrics.totalInvestment)}
-                  </p>
-                </div>
-                <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl">
-                  <IndianRupee className="w-5 h-5 text-white" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-6 hover:shadow-xl transition-shadow">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4 ml-8">
-                  <p className="text-xl font-medium text-gray-600">
-                    Fish Output (MT)
-                  </p>
-                  <p className="text-4xl font-bold text-purple-600">
-                    {globalPMMSYMetrics.fishOutput.toFixed(2)}
-                  </p>
-                </div>
-                <div className="p-3 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl">
-                  <CheckCircle className="w-5 h-5 text-white" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-6 hover:shadow-xl transition-shadow">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4 ml-8">
-                  <p className="text-xl font-medium text-gray-600">
-                    Employment Generated
-                  </p>
-                  <p className="text-4xl font-bold text-orange-600">
-                    {globalPMMSYMetrics.totalEmploymentGenerated.toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-3 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl">
-                  <Users className="w-5 h-5 text-white" />
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          kpis && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
-              <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-6 hover:shadow-xl transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4 ml-8">
-                    <p className="text-xl font-medium text-gray-600">Average</p>
-                    <p className="text-4xl font-bold text-blue-600">
-                      {formatMetricValue(selectedMetric, kpis.average)}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl">
-                    {getMetricIcon(selectedMetric)}
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-6 hover:shadow-xl transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4 ml-8">
-                    <p className="text-xl font-medium text-gray-600">Minimum</p>
-                    <p className="text-4xl font-bold text-green-600">
-                      {formatMetricValue(selectedMetric, kpis.min)}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl">
-                    <TrendingUp className="w-5 h-5 text-white transform rotate-180" />
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-6 hover:shadow-xl transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4 ml-8">
-                    <p className="text-xl font-medium text-gray-600">Maximum</p>
-                    <p className="text-4xl font-bold text-purple-600">
-                      {formatMetricValue(selectedMetric, kpis.max)}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl">
-                    <TrendingUp className="w-5 h-5 text-white" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        )}
+        {/* Filters and KPIs */}
+        <FiltersAndKPIs
+          selectedMetric={selectedMetric}
+          setSelectedMetric={setSelectedMetric}
+          selectedScheme={selectedScheme}
+          setSelectedScheme={setSelectedScheme}
+          selectedGender={selectedGender}
+          setSelectedGender={setSelectedGender}
+          selectedYear={selectedYear}
+          setSelectedYear={setSelectedYear}
+          selectedSectorPMMSY={selectedSectorPMMSY}
+          setSelectedSectorPMMSY={debouncedSetSelectedSectorPMMSY}
+          selectedActivityPMMSY={selectedActivityPMMSY}
+          setSelectedActivityPMMSY={debouncedSetSelectedActivityPMMSY}
+          selectedFinancialYearPMMSY={selectedFinancialYearPMMSY}
+          setSelectedFinancialYearPMMSY={debouncedSetSelectedFinancialYearPMMSY}
+          pmmsySectors={pmmsySectors}
+          pmmsyActivityTypes={pmmsyActivityTypes}
+          pmmsyFinancialYears={pmmsyFinancialYears}
+          globalPMMSYMetrics={globalPMMSYMetrics}
+          kpis={kpis}
+          formatMetricValue={formatMetricValue}
+          getMetricIcon={getMetricIcon}
+        />
 
         {/* Main Content */}
         <div className="grid grid-cols-5 gap-2">
@@ -1335,10 +977,9 @@ const App: React.FC = () => {
               formatMetricValue={formatMetricValue}
               getFullMetricName={getFullMetricName}
               officerNames={officerNames}
-              onAreaClick={handleAreaClick} // Use the new handler
+              onAreaClick={handleAreaClick}
               mapView={mapView}
             />
-            {/* Legend (conditional based on selectedScheme) */}
             {selectedScheme !== "PMMSY" && (
               <div className="absolute bottom-4 left-4 bg-white/90 p-3 rounded-lg shadow-md border border-gray-200">
                 <h4 className="text-sm font-semibold mb-2 text-gray-800">
@@ -1347,511 +988,76 @@ const App: React.FC = () => {
                 <div className="space-y-1">
                   {brackets[selectedMetric].map((bracket, index) => (
                     <div key={index} className="flex items-center">
-                      <div
-                        className="w-4 h-4 mr-2 rounded-sm"
-                        style={{ backgroundColor: bracket.color }}
-                      ></div>
-                      <span className="text-xs text-gray-700">
-                        {bracket.label}
-                      </span>
+                      <div className="w-4 h-4 mr-2 rounded-sm" style={{ backgroundColor: bracket.color }}></div>
+                      <span className="text-xs text-gray-700">{bracket.label}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
           </div>
-          <div
-            className={`${
-              selectedAreaDetails ? "col-span-2" : "col-span-2"
-            } space-y-2 ${selectedAreaDetails ? "block" : "hidden"} lg:block`}
-          >
-            {selectedScheme === "PMMSY" && globalPMMSYMetrics ? (
-              // PMMSY specific charts and employment details (global view)
+          <div className={`${selectedAreaDetails ? "col-span-2" : "col-span-2"} space-y-2 ${selectedAreaDetails ? "block" : "hidden"} lg:block`}>
+            {selectedScheme === "PMMSY" ? (
               <>
-                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 pl-4">
-                    Sector Distribution
-                  </h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={globalPMMSYMetrics.sectorDistribution}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        label={({ name, value }) => `${name}: ${value}`}
-                      >
-                        {globalPMMSYMetrics.sectorDistribution.map(
-                          (entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={getColor("sector", entry.name)}
-                            />
-                          )
-                        )}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-4">
-                  <div className="flex justify-between items-center mb-4 pl-4">
-                    <h2 className="text-lg font-semibold text-gray-900">
-                      Projects by State/UT
-                    </h2>
-                  </div>
-                  <ResponsiveContainer
-                    width="100%"
-                    height={window.innerWidth < 640 ? 250 : 290}
-                  >
-                    <BarChart
-                      layout="horizontal"
-                      data={globalPMMSYMetrics.projectsByStateUT
-                        .sort((a, b) => b.value - a.value)
-                        .slice(0, 10)}
-                      margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
-                    >
-                      <YAxis
-                        type="number"
-                        tickFormatter={(value) => value.toLocaleString()}
-                        tick={{ fontSize: window.innerWidth < 640 ? 8 : 10 }}
-                      />
-                      <XAxis
-                        type="category"
-                        dataKey="name"
-                        tick={{ fontSize: window.innerWidth < 640 ? 8 : 10 }}
-                      />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="#6366f1" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-4">
-                  <h4 className="text-md font-semibold text-gray-800 mt-4 pl-4">
-                    Employment Generation
-                  </h4>
+                <SectorDistributionPieChart
+                  sectorDistribution={globalPMMSYMetrics.sectorDistribution}
+                  getColor={getColor}
+                />
+                <ProjectsBarChart projectsByStateUT={globalPMMSYMetrics.projectsByStateUT} />
+                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2">
+                  <h4 className="text-md font-semibold text-gray-800 mt-4 pl-4">Employment Generation</h4>
                   <div className="grid grid-cols-2 gap-3 p-4">
                     <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-sm font-medium text-gray-600">
-                        Direct (Women)
-                      </p>
-                      <p className="text-lg font-bold text-gray-800">
-                        {globalPMMSYMetrics.directEmploymentWomen.toLocaleString()}
-                      </p>
+                      <p className="text-sm font-medium text-gray-600">Direct (Women)</p>
+                      <p className="text-lg font-bold text-gray-800">{globalPMMSYMetrics.directEmploymentWomen.toLocaleString()}</p>
                     </div>
                     <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-sm font-medium text-gray-600">
-                        Direct (Men)
-                      </p>
-                      <p className="text-lg font-bold text-gray-800">
-                        {globalPMMSYMetrics.directEmploymentMen.toLocaleString()}
-                      </p>
+                      <p className="text-sm font-medium text-gray-600">Direct (Men)</p>
+                      <p className="text-lg font-bold text-gray-800">{globalPMMSYMetrics.directEmploymentMen.toLocaleString()}</p>
                     </div>
                     <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-sm font-medium text-gray-600">
-                        Indirect (Women)
-                      </p>
-                      <p className="text-lg font-bold text-gray-800">
-                        {globalPMMSYMetrics.indirectEmploymentWomen.toLocaleString()}
-                      </p>
+                      <p className="text-sm font-medium text-gray-600">Indirect (Women)</p>
+                      <p className="text-lg font-bold text-gray-800">{globalPMMSYMetrics.indirectEmploymentWomen.toLocaleString()}</p>
                     </div>
                     <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-sm font-medium text-gray-600">
-                        Indirect (Men)
-                      </p>
-                      <p className="text-lg font-bold text-gray-800">
-                        {globalPMMSYMetrics.indirectEmploymentMen.toLocaleString()}
-                      </p>
+                      <p className="text-sm font-medium text-gray-600">Indirect (Men)</p>
+                      <p className="text-lg font-bold text-gray-800">{globalPMMSYMetrics.indirectEmploymentMen.toLocaleString()}</p>
                     </div>
                   </div>
                 </div>
               </>
             ) : (
-              // Existing generic charts
               <>
-                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 pl-4">
-                    Distribution Overview
-                  </h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        label={({ name, value }) => `${name}: ${value}`}
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-4">
-                  <div className="flex justify-between items-center mb-4 pl-4">
-                    <h2 className="text-lg font-semibold text-gray-900">
-                      Top 10{" "}
-                      {mapView === "state"
-                        ? "States"
-                        : mapView === "district"
-                        ? "Districts"
-                        : "Sub-Districts"}{" "}
-                      by {getMetricDisplayName(selectedMetric)}
-                    </h2>
-                    <select
-                      value={selectedBarChartCategory}
-                      onChange={(e) =>
-                        setSelectedBarChartCategory(
-                          e.target.value as "scheme" | "gender" | "year"
-                        )
-                      }
-                      className="p-1 bg-gray-50 border border-gray-300 rounded-md text-xs sm:text-sm"
-                    >
-                      <option value="scheme">Scheme</option>
-                      <option value="gender">Gender</option>
-                      <option value="year">Year</option>
-                    </select>
-                  </div>
-                  <ResponsiveContainer
-                    width="100%"
-                    height={window.innerWidth < 640 ? 250 : 290}
-                  >
-                    <BarChart
-                      layout="horizontal"
-                      data={barChartData}
-                      margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
-                    >
-                      <YAxis
-                        type="number"
-                        tickFormatter={(value) =>
-                          formatMetricValue(selectedMetric, value)
-                        }
-                        tick={{ fontSize: window.innerWidth < 640 ? 8 : 10 }}
-                      />
-                      <XAxis
-                        type="category"
-                        dataKey="name"
-                        tick={{ fontSize: window.innerWidth < 640 ? 8 : 10 }}
-                      />
-                      <Tooltip content={<CustomBarTooltip />} />
-                      {barChartKeys.map((key) => (
-                        <Bar key={key} dataKey={key} stackId="a">
-                          {barChartData.map((entry, index) => (
-                            <Cell
-                              key={`cell-${key}-${index}`}
-                              fill={getColor(selectedMetric, key)}
-                            />
-                          ))}
-                        </Bar>
-                      ))}
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <DistributionPieChart pieData={pieData} />
+                <TopAreasBarChart
+                  barChartData={barChartData}
+                  barChartKeys={barChartKeys}
+                  barChartDisplayNamesMap={barChartDisplayNamesMap}
+                  selectedMetric={selectedMetric}
+                  getColor={getColor}
+                  formatMetricValue={formatMetricValue}
+                  mapView={mapView}
+                  selectedBarChartCategory={selectedBarChartCategory}
+                />
               </>
             )}
           </div>
         </div>
-      </main>
 
-      {/* Area Details Popup */}
-      <div
-        className={`fixed right-0 top-0 h-full w-full sm:w-96 bg-white/95 backdrop-blur-lg shadow-2xl z-50 transform transition-transform duration-300 ${
-          selectedAreaDetails ? "translate-x-0" : "translate-x-full"
-        } flex flex-col p-2 px-4 border-l border-white/20 overflow-y-auto`}
-      >
-        <div className="flex justify-between items-center mb-1">
-          <h2 className="text-2xl font-bold text-gray-800">
-            {selectedAreaDetails?.name || "Area Details"}
-          </h2>
-          <button
-            onClick={() => setSelectedAreaDetails(null)}
-            className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors text-gray-600"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        {selectedAreaDetails && (
-          <>
-            <div className="bg-blue-50 p-3 rounded-lg flex items-center gap-2">
-              <Users className="w-4 h-4 text-blue-600" />
-              <strong className="font-semibold">Officer:</strong>{" "}
-              <span className="font-medium">{selectedAreaDetails.officer}</span>
-              <MapPin className="w-4 h-4 text-blue-600 ml-4" />
-              <strong className="font-semibold">Region Type:</strong>{" "}
-              <span className="font-medium">
-                {selectedAreaDetails.level === "state"
-                  ? "State"
-                  : selectedAreaDetails.level === "district"
-                  ? "District"
-                  : "Sub-District"}
-              </span>
-            </div>
-            {selectedScheme === "PMMSY" && selectedAreaDetails.pmmsyMetrics ? (
-              // PMMSY specific details in popup
-              <div className="bg-white rounded-lg border shadow-sm p-4 space-y-4">
-                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-indigo-600" />
-                  PMMSY Scheme Details
-                </h3>
-                <ul className="space-y-3">
-                  <li className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-100 rounded-full">
-                        <MapPin className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          Total Projects
-                        </p>
-                        <p className="text-xl font-bold text-gray-800">
-                          {selectedAreaDetails.pmmsyMetrics.totalProjects.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-100 rounded-full">
-                        <IndianRupee className="w-5 h-5 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          Total Investment
-                        </p>
-                        <p className="text-xl font-bold text-gray-800">
-                          ₹
-                          {formatNumber(
-                            selectedAreaDetails.pmmsyMetrics.totalInvestment
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-purple-100 rounded-full">
-                        <CheckCircle className="w-5 h-5 text-purple-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          Fish Output (MT)
-                        </p>
-                        <p className="text-xl font-bold text-gray-800">
-                          {selectedAreaDetails.pmmsyMetrics.fishOutput.toFixed(
-                            2
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-orange-100 rounded-full">
-                        <Users className="w-5 h-5 text-orange-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          Total Employment Generated
-                        </p>
-                        <p className="text-xl font-bold text-gray-800">
-                          {selectedAreaDetails.pmmsyMetrics.totalEmploymentGenerated.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                </ul>
-                <h4 className="text-md font-semibold text-gray-800 mt-4">
-                  Employment Generation
-                </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-sm font-medium text-gray-600">
-                      Direct (Women)
-                    </p>
-                    <p className="text-lg font-bold text-gray-800">
-                      {selectedAreaDetails.pmmsyMetrics.directEmploymentWomen.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-sm font-medium text-gray-600">
-                      Direct (Men)
-                    </p>
-                    <p className="text-lg font-bold text-gray-800">
-                      {selectedAreaDetails.pmmsyMetrics.directEmploymentMen.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-sm font-medium text-gray-600">
-                      Indirect (Women)
-                    </p>
-                    <p className="text-lg font-bold text-gray-800">
-                      {selectedAreaDetails.pmmsyMetrics.indirectEmploymentWomen.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-sm font-medium text-gray-600">
-                      Indirect (Men)
-                    </p>
-                    <p className="text-lg font-bold text-gray-800">
-                      {selectedAreaDetails.pmmsyMetrics.indirectEmploymentMen.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              // Existing generic metrics display
-              <div className="bg-white rounded-lg border shadow-sm p-4 space-y-4">
-                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-indigo-600" />
-                  Key Performance Indicators
-                </h3>
-                <ul className="space-y-3">
-                  <li className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-indigo-100 rounded-full">
-                        <IndianRupee className="w-5 h-5 text-indigo-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          Total Funds Allocated
-                        </p>
-                        <p className="text-xl font-bold text-gray-800">
-                          {selectedAreaDetails.metrics
-                            ? formatMetricValue(
-                                "funds",
-                                selectedAreaDetails.metrics.funds
-                              )
-                            : "N/A"}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-100 rounded-full">
-                        <Wallet className="w-5 h-5 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          Funds Utilized
-                        </p>
-                        <p className="text-xl font-bold text-gray-800">
-                          {selectedAreaDetails.metrics
-                            ? formatMetricValue(
-                                "funds_used",
-                                selectedAreaDetails.metrics.funds_used
-                              )
-                            : "N/A"}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-pink-100 rounded-full">
-                        <Users className="w-5 h-5 text-pink-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          Total Beneficiaries
-                        </p>
-                        <p className="text-xl font-bold text-gray-800">
-                          {selectedAreaDetails.metrics
-                            ? formatMetricValue(
-                                "beneficiaries",
-                                selectedAreaDetails.metrics.beneficiaries
-                              )
-                            : "N/A"}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-yellow-100 rounded-full">
-                        <Clock className="w-5 h-5 text-yellow-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          New Beneficiaries (Last 24h)
-                        </p>
-                        <p className="text-xl font-bold text-gray-800">
-                          {selectedAreaDetails.metrics
-                            ? formatMetricValue(
-                                "beneficiaries_last_24h",
-                                selectedAreaDetails.metrics
-                                  .beneficiaries_last_24h
-                              )
-                            : "N/A"}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-orange-100 rounded-full">
-                        <PlusCircle className="w-5 h-5 text-orange-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          Total Registrations
-                        </p>
-                        <p className="text-xl font-bold text-gray-800">
-                          {selectedAreaDetails.metrics
-                            ? formatMetricValue(
-                                "registrations",
-                                selectedAreaDetails.metrics.registrations
-                              )
-                            : "N/A"}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-red-100 rounded-full">
-                        <CheckCircle className="w-5 h-5 text-red-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          New Registrations (Last 24h)
-                        </p>
-                        <p className="text-xl font-bold text-gray-800">
-                          {selectedAreaDetails.metrics
-                            ? formatMetricValue(
-                                "registrations_last_24h",
-                                selectedAreaDetails.metrics
-                                  .registrations_last_24h
-                              )
-                            : "N/A"}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                </ul>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+        {/* Area Details Popup */}
+        <AreaDetailsPopup
+          selectedAreaDetails={selectedAreaDetails}
+          selectedScheme={selectedScheme}
+          formatMetricValue={formatMetricValue}
+          setSelectedAreaDetails={setSelectedAreaDetails}
+        />
+      </main>
 
       <footer className="bg-white/80 backdrop-blur-md border-t border-white/20 mt-2">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="text-center text-gray-600">
-            <p>
-              © 2025 Department of Fisheries Dashboard. All rights reserved.
-            </p>
-            <p className="text-sm mt-2">
-              Supporting sustainable fisheries development
-            </p>
+            <p>© 2025 Department of Fisheries Dashboard. All rights reserved.</p>
+            <p className="text-sm mt-2">Supporting sustainable fisheries development</p>
           </div>
         </div>
       </footer>
