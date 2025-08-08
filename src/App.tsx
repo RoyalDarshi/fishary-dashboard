@@ -1064,6 +1064,7 @@ const App: React.FC = () => {
                   mapView={mapView}
                   selectedBarChartCategory={selectedBarChartCategory}
                   setSelectedBarChartCategory={setSelectedBarChartCategory}
+                  selectedScheme={selectedScheme}
                 />
                 <EmploymentBarChart
                   employmentData={{
@@ -1088,6 +1089,7 @@ const App: React.FC = () => {
                   mapView={mapView}
                   selectedBarChartCategory={selectedBarChartCategory}
                   setSelectedBarChartCategory={setSelectedBarChartCategory}
+                  selectedScheme={selectedScheme}
                 />
               </>
             )}

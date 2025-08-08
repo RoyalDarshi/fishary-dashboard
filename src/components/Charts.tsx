@@ -10,7 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import type { PMMSYAggregatedData } from "../App";
+import type { PMMSYAggregatedData, SchemeKey } from "../App";
 
 // Props interface for SectorDistributionPieChart
 interface SectorDistributionPieChartProps {
@@ -34,6 +34,7 @@ interface TopAreasBarChartProps {
   mapView: "state" | "district" | "sub-district";
   selectedBarChartCategory: "scheme" | "gender" | "year";
   setSelectedBarChartCategory: (category: "scheme" | "gender" | "year") => void;
+  selectedScheme: SchemeKey;
 }
 
 // Props interface for EmploymentBarChart
@@ -175,6 +176,7 @@ export const TopAreasBarChart: React.FC<TopAreasBarChartProps> = ({
   mapView,
   selectedBarChartCategory,
   setSelectedBarChartCategory,
+  selectedScheme,
 }) => {
   const CustomBarTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -214,7 +216,7 @@ export const TopAreasBarChart: React.FC<TopAreasBarChartProps> = ({
           onChange={(e) => setSelectedBarChartCategory(e.target.value as "scheme" | "gender" | "year")}
           className="p-1 bg-gray-50 border border-gray-300 rounded-md text-xs sm:text-sm"
         >
-          <option value="scheme">Scheme</option>
+          <option value="scheme">{selectedScheme === "PMMSY" ? "Sector" : "Scheme"}</option>
           <option value="gender">Gender</option>
           <option value="year">Year</option>
         </select>
