@@ -18,11 +18,6 @@ interface SectorDistributionPieChartProps {
   getColor: (metric: string, value: string) => string;
 }
 
-// Props interface for ProjectsBarChart
-interface ProjectsBarChartProps {
-  projectsByStateUT: PMMSYAggregatedData["projectsByStateUT"];
-}
-
 // Props interface for DistributionPieChart
 interface DistributionPieChartProps {
   pieData: Array<{ name: string; value: number; color: string }>;
@@ -38,6 +33,7 @@ interface TopAreasBarChartProps {
   formatMetricValue: (metric: string, value: number) => string;
   mapView: "state" | "district" | "sub-district";
   selectedBarChartCategory: "scheme" | "gender" | "year";
+  setSelectedBarChartCategory: (category: "scheme" | "gender" | "year") => void;
 }
 
 // Props interface for EmploymentBarChart
@@ -76,33 +72,6 @@ export const SectorDistributionPieChart: React.FC<SectorDistributionPieChartProp
           </Pie>
           <Tooltip />
         </PieChart>
-      </ResponsiveContainer>
-    </div>
-  );
-};
-
-// Projects by State/UT Bar Chart for PMMSY
-export const ProjectsBarChart: React.FC<ProjectsBarChartProps> = ({ projectsByStateUT }) => {
-  return (
-    <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2">
-      <div className="flex justify-between items-center mb-4 pl-4">
-        <h2 className="text-lg font-semibold text-gray-900">Projects by State/UT</h2>
-      </div>
-      <ResponsiveContainer width="100%" height={window.innerWidth < 640 ? 250 : 290}>
-        <BarChart
-          layout="horizontal"
-          data={projectsByStateUT.sort((a, b) => b.value - a.value).slice(0, 10)}
-          margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
-        >
-          <YAxis
-            type="number"
-            tickFormatter={(value) => value.toLocaleString()}
-            tick={{ fontSize: window.innerWidth < 640 ? 8 : 10 }}
-          />
-          <XAxis type="category" dataKey="name" tick={{ fontSize: window.innerWidth < 640 ? 8 : 10 }} />
-          <Tooltip />
-          <Bar dataKey="value" fill="#6366f1" />
-        </BarChart>
       </ResponsiveContainer>
     </div>
   );
@@ -195,7 +164,7 @@ export const EmploymentBarChart: React.FC<EmploymentBarChartProps> = ({ employme
   );
 };
 
-// Top Areas Bar Chart for non-PMMSY data
+// Top Areas Bar Chart for all data
 export const TopAreasBarChart: React.FC<TopAreasBarChartProps> = ({
   barChartData,
   barChartKeys,
@@ -205,6 +174,7 @@ export const TopAreasBarChart: React.FC<TopAreasBarChartProps> = ({
   formatMetricValue,
   mapView,
   selectedBarChartCategory,
+  setSelectedBarChartCategory,
 }) => {
   const CustomBarTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -237,11 +207,11 @@ export const TopAreasBarChart: React.FC<TopAreasBarChartProps> = ({
         <h2 className="text-lg font-semibold text-gray-900">
           Top 10{" "}
           {mapView === "state" ? "States" : mapView === "district" ? "Districts" : "Sub-Districts"}{" "}
-          by {selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)}
+          by {getMetricDisplayName(selectedMetric)}
         </h2>
         <select
           value={selectedBarChartCategory}
-          onChange={(e) => (e.target.value as "scheme" | "gender" | "year")}
+          onChange={(e) => setSelectedBarChartCategory(e.target.value as "scheme" | "gender" | "year")}
           className="p-1 bg-gray-50 border border-gray-300 rounded-md text-xs sm:text-sm"
         >
           <option value="scheme">Scheme</option>
@@ -273,4 +243,15 @@ export const TopAreasBarChart: React.FC<TopAreasBarChartProps> = ({
       </ResponsiveContainer>
     </div>
   );
+
+  function getMetricDisplayName(metric: string): string {
+    return {
+      beneficiaries: "Beneficiaries",
+      funds: "Funds Allocated",
+      registrations: "Total Registrations",
+      totalProjects: "Total Projects",
+      totalInvestment: "Total Investment",
+      fishOutput: "Fish Output",
+    }[metric] || "Unknown Metric";
+  }
 };

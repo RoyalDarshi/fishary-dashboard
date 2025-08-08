@@ -5,7 +5,6 @@ import AreaDetailsPopup from "./components/AreaDetailsPopup";
 import FiltersAndKPIs from "./components/FiltersAndKPIs";
 import {
   SectorDistributionPieChart,
-  ProjectsBarChart,
   DistributionPieChart,
   TopAreasBarChart,
   EmploymentBarChart,
@@ -291,95 +290,92 @@ const App: React.FC = () => {
   ]);
 
   // Aggregate PMMSY data for charts
-const aggregatePMMSYChartData = useCallback(() => {
-  if (!mockPMMSYData || !polygonData) return;
+  const aggregatePMMSYChartData = useCallback(() => {
+    if (!mockPMMSYData || !polygonData) return;
 
-  const globalMetrics: PMMSYAggregatedData = {
-    totalProjects: 0,
-    totalInvestment: 0,
-    fishOutput: 0,
-    totalEmploymentGenerated: 0,
-    directEmploymentMen: 0,
-    directEmploymentWomen: 0,
-    indirectEmploymentMen: 0,
-    indirectEmploymentWomen: 0,
-    projectsByStateUT: [],
-    sectorDistribution: [],
-  };
+    const globalMetrics: PMMSYAggregatedData = {
+      totalProjects: 0,
+      totalInvestment: 0,
+      fishOutput: 0,
+      totalEmploymentGenerated: 0,
+      directEmploymentMen: 0,
+      directEmploymentWomen: 0,
+      indirectEmploymentMen: 0,
+      indirectEmploymentWomen: 0,
+      projectsByStateUT: [],
+      sectorDistribution: [],
+    };
 
-  const projectsByAreaMap = new Map<string, number>();
-  const sectorDistributionMap = new Map<string, number>();
+    const projectsByAreaMap = new Map<string, number>();
+    const sectorDistributionMap = new Map<string, number>();
 
-  // filter by mapView like other schemes do
-  const featuresForChart = polygonData.features.filter(
-    (f) =>
-      (mapView === "state" && f.properties.level === "state") ||
-      (mapView === "district" && f.properties.level === "district") ||
-      (mapView === "sub-district" && f.properties.level === "sub-district")
-  );
+    const featuresForChart = polygonData.features.filter(
+      (f) =>
+        (mapView === "state" && f.properties.level === "state") ||
+        (mapView === "district" && f.properties.level === "district") ||
+        (mapView === "sub-district" && f.properties.level === "sub-district")
+    );
 
-  featuresForChart.forEach((feature) => {
-    const areaId = feature.properties.shapeID;
-    const areaData = mockPMMSYData[areaId];
-    if (!areaData) return;
+    featuresForChart.forEach((feature) => {
+      const areaId = feature.properties.shapeID;
+      const areaData = mockPMMSYData[areaId];
+      if (!areaData) return;
 
-    let areaName = feature.properties.shapeName || "Unknown";
-    if (mapView === "district" && feature.properties.district_name) {
-      areaName = feature.properties.district_name;
-    }
-    if (mapView === "sub-district" && feature.properties.subdistrict_name) {
-      areaName = feature.properties.subdistrict_name;
-    }
-
-    Object.entries(areaData).forEach(([key, metrics]) => {
-      const [, gender, year, sector] = key.split("_");
-      const genderMatch = selectedGender === "all" || gender === selectedGender;
-      const yearMatch = selectedFinancialYearPMMSY === "all" || year === selectedFinancialYearPMMSY;
-      const sectorMatch = selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY;
-
-      if (genderMatch && yearMatch && sectorMatch) {
-        globalMetrics.totalProjects += metrics.totalProjects || 0;
-        globalMetrics.totalInvestment += metrics.totalInvestment || 0;
-        globalMetrics.fishOutput += metrics.fishOutput || 0;
-
-        const metricValue = metrics[selectedMetric] || 0;
-        projectsByAreaMap.set(areaName, (projectsByAreaMap.get(areaName) || 0) + metricValue);
-
-        if (sector !== "all") {
-          sectorDistributionMap.set(sector, (sectorDistributionMap.get(sector) || 0) + (metrics.totalProjects || 0));
-        }
+      let areaName = feature.properties.shapeName || "Unknown";
+      if (mapView === "district" && feature.properties.district_name) {
+        areaName = feature.properties.district_name;
       }
+      if (mapView === "sub-district" && feature.properties.subdistrict_name) {
+        areaName = feature.properties.subdistrict_name;
+      }
+
+      Object.entries(areaData).forEach(([key, metrics]) => {
+        const [, gender, year, sector] = key.split("_");
+        const genderMatch = selectedGender === "all" || gender === selectedGender;
+        const yearMatch = selectedFinancialYearPMMSY === "all" || year === selectedFinancialYearPMMSY;
+        const sectorMatch = selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY;
+
+        if (genderMatch && yearMatch && sectorMatch) {
+          globalMetrics.totalProjects += metrics.totalProjects || 0;
+          globalMetrics.totalInvestment += metrics.totalInvestment || 0;
+          globalMetrics.fishOutput += metrics.fishOutput || 0;
+
+          const metricValue = metrics[selectedMetric] || 0;
+          projectsByAreaMap.set(areaName, (projectsByAreaMap.get(areaName) || 0) + metricValue);
+
+          if (sector !== "all") {
+            sectorDistributionMap.set(sector, (sectorDistributionMap.get(sector) || 0) + (metrics.totalProjects || 0));
+          }
+        }
+      });
     });
-  });
 
-  globalMetrics.totalEmploymentGenerated = Math.floor(globalMetrics.totalProjects * (5 + Math.random() * 10));
-  globalMetrics.directEmploymentMen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.4);
-  globalMetrics.directEmploymentWomen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.3);
-  globalMetrics.indirectEmploymentMen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.2);
-  globalMetrics.indirectEmploymentWomen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.1);
+    globalMetrics.totalEmploymentGenerated = Math.floor(globalMetrics.totalProjects * (5 + Math.random() * 10));
+    globalMetrics.directEmploymentMen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.4);
+    globalMetrics.directEmploymentWomen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.3);
+    globalMetrics.indirectEmploymentMen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.2);
+    globalMetrics.indirectEmploymentWomen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.1);
 
-  globalMetrics.projectsByStateUT = Array.from(projectsByAreaMap.entries())
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10);
+    globalMetrics.projectsByStateUT = Array.from(projectsByAreaMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
 
-  globalMetrics.sectorDistribution = Array.from(sectorDistributionMap.entries()).map(([name, value]) => ({
-    name,
-    value,
-  }));
+    globalMetrics.sectorDistribution = Array.from(sectorDistributionMap.entries()).map(([name, value]) => ({
+      name,
+      value,
+    }));
 
-  setGlobalPMMSYMetrics(globalMetrics);
-}, [
-  mockPMMSYData,
-  polygonData,
-  mapView,
-  selectedGender,
-  selectedSectorPMMSY,
-  selectedFinancialYearPMMSY,
-  selectedMetric,
-]);
-
-
+    setGlobalPMMSYMetrics(globalMetrics);
+  }, [
+    mockPMMSYData,
+    polygonData,
+    mapView,
+    selectedGender,
+    selectedSectorPMMSY,
+    selectedFinancialYearPMMSY,
+    selectedMetric,
+  ]);
 
   // Update PMMSY chart data when filters change
   useEffect(() => {
@@ -678,7 +674,100 @@ const aggregatePMMSYChartData = useCallback(() => {
     }));
   }, [metricData, filteredGeoJsonData, selectedMetric, demographicKey, mapView]);
 
-  // Bar chart data
+  // Bar chart data for PMMSY
+  const pmmsyBarData = useMemo(() => {
+    if (!mockPMMSYData || !polygonData) return { data: [], keys: [], displayNamesMap: {} };
+
+    const featuresForBarChart = polygonData.features.filter(
+      (f) =>
+        (mapView === "state" && f.properties.level === "state") ||
+        (mapView === "district" && f.properties.level === "district") ||
+        (mapView === "sub-district" && f.properties.level === "sub-district")
+    );
+
+    const overallMetricDataForSorting: Record<string, number> = {};
+    featuresForBarChart.forEach((feature) => {
+      const areaId = feature.properties.shapeID;
+      const areaData = mockPMMSYData[areaId];
+      if (!areaData) return;
+      let totalValue = 0;
+      Object.entries(areaData).forEach(([key, metrics]) => {
+        const [, gender, year, sector] = key.split("_");
+        const genderMatch = selectedGender === "all" || gender === selectedGender;
+        const yearMatch = selectedFinancialYearPMMSY === "all" || year === selectedFinancialYearPMMSY;
+        const sectorMatch = selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY;
+        if (genderMatch && yearMatch && sectorMatch) {
+          totalValue += metrics[selectedMetric] || 0;
+        }
+      });
+      overallMetricDataForSorting[areaId] = totalValue;
+    });
+
+    const sortedAreas = featuresForBarChart
+      .map((feature) => ({
+        id: feature.properties.shapeID,
+        name: feature.properties.shapeName || "Unknown Area",
+        overallValue: overallMetricDataForSorting[feature.properties.shapeID] || 0,
+      }))
+      .sort((a, b) => b.overallValue - a.overallValue)
+      .slice(0, 10);
+
+    let keys: string[] = [];
+    let getDemographicKey: (areaId: string, key: string) => string;
+    let displayNamesMap: Record<string, string> = {};
+
+    switch (selectedBarChartCategory) {
+      case "gender":
+        keys = ["male", "female", "transgender"];
+        getDemographicKey = (areaId, key) =>
+          `PMMSY_${key}_${selectedFinancialYearPMMSY === "all" ? "2024" : selectedFinancialYearPMMSY}_${
+            selectedSectorPMMSY === "all" ? "Inland" : selectedSectorPMMSY
+          }`;
+        displayNamesMap = genderDisplayNames;
+        break;
+      case "year":
+        keys = ["2021", "2022", "2023", "2024"];
+        getDemographicKey = (areaId, key) =>
+          `PMMSY_${selectedGender === "all" ? "male" : selectedGender}_${key}_${
+            selectedSectorPMMSY === "all" ? "Inland" : selectedSectorPMMSY
+          }`;
+        displayNamesMap = yearDisplayNames;
+        break;
+      case "scheme":
+        keys = ["Inland", "Marine"];
+        getDemographicKey = (areaId, key) =>
+          `PMMSY_${selectedGender === "all" ? "male" : selectedGender}_${
+            selectedFinancialYearPMMSY === "all" ? "2024" : selectedFinancialYearPMMSY
+          }_${key}`;
+        displayNamesMap = { Inland: "Inland", Marine: "Marine" };
+        break;
+      default:
+        return { data: [], keys: [], displayNamesMap: {} };
+    }
+
+    const data = sortedAreas.map((area) => {
+      const categoryValues: Record<string, number> = {};
+      keys.forEach((key) => {
+        const fullKey = getDemographicKey(area.id, key);
+        const value = mockPMMSYData[area.id]?.[fullKey]?.[selectedMetric] || 0;
+        categoryValues[key] = value;
+      });
+      return { name: area.name, ...categoryValues };
+    });
+
+    return { data, keys, displayNamesMap };
+  }, [
+    mockPMMSYData,
+    polygonData,
+    selectedMetric,
+    selectedGender,
+    selectedFinancialYearPMMSY,
+    selectedSectorPMMSY,
+    selectedBarChartCategory,
+    mapView,
+  ]);
+
+  // Bar chart data for non-PMMSY
   const overallMetricDataForSorting = useMemo(() => {
     if (!metricData || !polygonData) return {};
     const overallKey = selectedScheme === "PMMSY" ? "PMMSY_aggregated" : `all_all_all`;
@@ -965,7 +1054,17 @@ const aggregatePMMSYChartData = useCallback(() => {
                   sectorDistribution={globalPMMSYMetrics.sectorDistribution}
                   getColor={getColor}
                 />
-                <ProjectsBarChart projectsByStateUT={globalPMMSYMetrics.projectsByStateUT} />
+                <TopAreasBarChart
+                  barChartData={pmmsyBarData.data}
+                  barChartKeys={pmmsyBarData.keys}
+                  barChartDisplayNamesMap={pmmsyBarData.displayNamesMap}
+                  selectedMetric={selectedMetric}
+                  getColor={getColor}
+                  formatMetricValue={formatMetricValue}
+                  mapView={mapView}
+                  selectedBarChartCategory={selectedBarChartCategory}
+                  setSelectedBarChartCategory={setSelectedBarChartCategory}
+                />
                 <EmploymentBarChart
                   employmentData={{
                     directEmploymentMen: globalPMMSYMetrics.directEmploymentMen,
@@ -988,6 +1087,7 @@ const aggregatePMMSYChartData = useCallback(() => {
                   formatMetricValue={formatMetricValue}
                   mapView={mapView}
                   selectedBarChartCategory={selectedBarChartCategory}
+                  setSelectedBarChartCategory={setSelectedBarChartCategory}
                 />
               </>
             )}
