@@ -848,50 +848,97 @@ const App: React.FC = () => {
 
   // Handle area click
   const handleAreaClick = (areaDetails: any) => {
-    if (selectedScheme === "PMMSY") {
-      const metrics = metricData[areaDetails.id]?.[demographicKey] || {
-        totalProjects: 0,
-        totalInvestment: 0,
-        fishOutput: 0,
-      };
-      const totalEmploymentGenerated = Math.floor(metrics.totalProjects * (5 + Math.random() * 10));
-      const pmmsyMetrics: PMMSYAggregatedData = {
-        totalProjects: metrics.totalProjects || 0,
-        totalInvestment: metrics.totalInvestment || 0,
-        fishOutput: metrics.fishOutput || 0,
-        totalEmploymentGenerated,
-        directEmploymentMen: Math.floor(totalEmploymentGenerated * 0.4),
-        directEmploymentWomen: Math.floor(totalEmploymentGenerated * 0.3),
-        indirectEmploymentMen: Math.floor(totalEmploymentGenerated * 0.2),
-        indirectEmploymentWomen: Math.floor(totalEmploymentGenerated * 0.1),
-        projectsByStateUT: [],
-        sectorDistribution: [],
-      };
-      setSelectedAreaDetails({
-        ...areaDetails,
-        name: areaDetails.name || "Unknown Area",
-        officer: officerNames[areaDetails.id] || "Unknown Officer",
-        level: areaDetails.level || "Unknown",
-        pmmsyMetrics,
-      });
-    } else {
-      const metrics = metricData[areaDetails.id]?.[demographicKey] || {
-        beneficiaries: 0,
-        funds: 0,
-        registrations: 0,
-        funds_used: 0,
-        beneficiaries_last_24h: 0,
-        registrations_last_24h: 0,
-      };
-      setSelectedAreaDetails({
-        ...areaDetails,
-        name: areaDetails.name || "Unknown Area",
-        officer: officerNames[areaDetails.id] || "Unknown Officer",
-        level: areaDetails.level || "Unknown",
-        metrics,
+  if (!polygonData || !metricData) return;
+
+  // Determine the group for averaging based on area type
+  const getAverageGroup = (level: string, properties: any) => {
+    if (level === "state") {
+      return polygonData.features.filter(f => f.properties.level === "state");
+    } else if (level === "district") {
+      return polygonData.features.filter(f => f.properties.level === "district" && f.properties.state_name === properties.state_name);
+    } else if (level === "sub-district") {
+      return polygonData.features.filter(f => f.properties.level === "sub-district" && f.properties.district_name === properties.district_name);
+    }
+    return [];
+  };
+
+  const group = getAverageGroup(areaDetails.level, areaDetails);
+  const metricSums: { [key: string]: number } = {};
+  const count = group.length;
+
+  group.forEach(feature => {
+    const areaMetrics = metricData[feature.properties.shapeID]?.[demographicKey];
+    if (areaMetrics) {
+      Object.keys(areaMetrics).forEach(key => {
+        metricSums[key] = (metricSums[key] || 0) + (areaMetrics[key] || 0);
       });
     }
-  };
+  });
+
+  const averages: { [key: string]: number } = {};
+  Object.keys(metricSums).forEach(key => {
+    averages[key] = count > 0 ? metricSums[key] / count : 0;
+  });
+
+  if (selectedScheme === "PMMSY") {
+    const metrics = metricData[areaDetails.id]?.[demographicKey] || {
+      totalProjects: 0,
+      totalInvestment: 0,
+      fishOutput: 0,
+    };
+    const totalEmploymentGenerated = Math.floor(metrics.totalProjects * (5 + Math.random() * 10));
+    const pmmsyMetrics: PMMSYAggregatedData = {
+      totalProjects: metrics.totalProjects || 0,
+      totalInvestment: metrics.totalInvestment || 0,
+      fishOutput: metrics.fishOutput || 0,
+      totalEmploymentGenerated,
+      directEmploymentMen: Math.floor(totalEmploymentGenerated * 0.4),
+      directEmploymentWomen: Math.floor(totalEmploymentGenerated * 0.3),
+      indirectEmploymentMen: Math.floor(totalEmploymentGenerated * 0.2),
+      indirectEmploymentWomen: Math.floor(totalEmploymentGenerated * 0.1),
+      projectsByStateUT: [],
+      sectorDistribution: [],
+    };
+    const averageTotalEmploymentGenerated = Math.floor(averages.totalProjects * (5 + Math.random() * 10));
+    const pmmsyAverages: PMMSYAggregatedData = {
+      totalProjects: averages.totalProjects || 0,
+      totalInvestment: averages.totalInvestment || 0,
+      fishOutput: averages.fishOutput || 0,
+      totalEmploymentGenerated: averageTotalEmploymentGenerated,
+      directEmploymentMen: Math.floor(averageTotalEmploymentGenerated * 0.4),
+      directEmploymentWomen: Math.floor(averageTotalEmploymentGenerated * 0.3),
+      indirectEmploymentMen: Math.floor(averageTotalEmploymentGenerated * 0.2),
+      indirectEmploymentWomen: Math.floor(averageTotalEmploymentGenerated * 0.1),
+      projectsByStateUT: [],
+      sectorDistribution: [],
+    };
+    setSelectedAreaDetails({
+      ...areaDetails,
+      name: areaDetails.name || "Unknown Area",
+      officer: officerNames[areaDetails.id] || "Unknown Officer",
+      level: areaDetails.level || "Unknown",
+      pmmsyMetrics,
+      pmmsyAverages,
+    });
+  } else {
+    const metrics = metricData[areaDetails.id]?.[demographicKey] || {
+      beneficiaries: 0,
+      funds: 0,
+      registrations: 0,
+      funds_used: 0,
+      beneficiaries_last_24h: 0,
+      registrations_last_24h: 0,
+    };
+    setSelectedAreaDetails({
+      ...areaDetails,
+      name: areaDetails.name || "Unknown Area",
+      officer: officerNames[areaDetails.id] || "Unknown Officer",
+      level: areaDetails.level || "Unknown",
+      metrics,
+      averages,
+    });
+  }
+};
 
   // Loading and error states
   if (error) {
