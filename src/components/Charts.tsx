@@ -144,7 +144,7 @@ export const EmploymentBarChart: React.FC<EmploymentBarChartProps> = ({ employme
   return (
     <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2">
       <h3 className="text-lg font-semibold text-gray-900 pl-4">Employment Generation</h3>
-      <ResponsiveContainer width="100%" height={window.innerWidth < 640 ? 250 : 290}>
+      <ResponsiveContainer width="100%" height={250}>
         <BarChart
           layout="horizontal"
           data={data}
