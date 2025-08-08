@@ -104,8 +104,7 @@ const AreaDetailsPopup: React.FC<AreaDetailsPopupProps> = ({
                       <p className="text-sm font-medium text-gray-500">
                         Total Investment
                       </p>
-                      <p className="text-xl font-bold text-gray-800">
-                        ₹
+                      <p className="text-xl font-bold text-gray-800">                       
                         {formatMetricValue(
                           "funds",
                           selectedAreaDetails.pmmsyMetrics.totalInvestment
