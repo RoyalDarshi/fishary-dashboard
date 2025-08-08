@@ -291,62 +291,95 @@ const App: React.FC = () => {
   ]);
 
   // Aggregate PMMSY data for charts
-  const aggregatePMMSYChartData = useCallback(() => {
-    if (!mockPMMSYData) return;
-    const globalMetrics: PMMSYAggregatedData = {
-      totalProjects: 0,
-      totalInvestment: 0,
-      fishOutput: 0,
-      totalEmploymentGenerated: 0,
-      directEmploymentMen: 0,
-      directEmploymentWomen: 0,
-      indirectEmploymentMen: 0,
-      indirectEmploymentWomen: 0,
-      projectsByStateUT: [],
-      sectorDistribution: [],
-    };
+const aggregatePMMSYChartData = useCallback(() => {
+  if (!mockPMMSYData || !polygonData) return;
 
-    const projectsByStateUTMap = new Map<string, number>();
-    const sectorDistributionMap = new Map<string, number>();
+  const globalMetrics: PMMSYAggregatedData = {
+    totalProjects: 0,
+    totalInvestment: 0,
+    fishOutput: 0,
+    totalEmploymentGenerated: 0,
+    directEmploymentMen: 0,
+    directEmploymentWomen: 0,
+    indirectEmploymentMen: 0,
+    indirectEmploymentWomen: 0,
+    projectsByStateUT: [],
+    sectorDistribution: [],
+  };
 
-    Object.entries(mockPMMSYData).forEach(([areaId, areaData]) => {
-      const feature = polygonData?.features.find((f) => f.properties.shapeID === areaId);
-      const stateName = feature?.properties.state_name || "Unknown";
+  const projectsByAreaMap = new Map<string, number>();
+  const sectorDistributionMap = new Map<string, number>();
 
-      Object.entries(areaData).forEach(([key, metrics]) => {
-        const [, gender, year, sector] = key.split("_");
-        const genderMatch = selectedGender === "all" || gender === selectedGender;
-        const yearMatch = selectedFinancialYearPMMSY === "all" || year === selectedFinancialYearPMMSY;
-        const sectorMatch = selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY;
-        if (genderMatch && yearMatch && sectorMatch) {
-          globalMetrics.totalProjects += metrics.totalProjects || 0;
-          globalMetrics.totalInvestment += metrics.totalInvestment || 0;
-          globalMetrics.fishOutput += metrics.fishOutput || 0;
-          projectsByStateUTMap.set(stateName, (projectsByStateUTMap.get(stateName) || 0) + (metrics.totalProjects || 0));
-          if (sector !== "all") {
-            sectorDistributionMap.set(sector, (sectorDistributionMap.get(sector) || 0) + (metrics.totalProjects || 0));
-          }
+  // filter by mapView like other schemes do
+  const featuresForChart = polygonData.features.filter(
+    (f) =>
+      (mapView === "state" && f.properties.level === "state") ||
+      (mapView === "district" && f.properties.level === "district") ||
+      (mapView === "sub-district" && f.properties.level === "sub-district")
+  );
+
+  featuresForChart.forEach((feature) => {
+    const areaId = feature.properties.shapeID;
+    const areaData = mockPMMSYData[areaId];
+    if (!areaData) return;
+
+    let areaName = feature.properties.shapeName || "Unknown";
+    if (mapView === "district" && feature.properties.district_name) {
+      areaName = feature.properties.district_name;
+    }
+    if (mapView === "sub-district" && feature.properties.subdistrict_name) {
+      areaName = feature.properties.subdistrict_name;
+    }
+
+    Object.entries(areaData).forEach(([key, metrics]) => {
+      const [, gender, year, sector] = key.split("_");
+      const genderMatch = selectedGender === "all" || gender === selectedGender;
+      const yearMatch = selectedFinancialYearPMMSY === "all" || year === selectedFinancialYearPMMSY;
+      const sectorMatch = selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY;
+
+      if (genderMatch && yearMatch && sectorMatch) {
+        globalMetrics.totalProjects += metrics.totalProjects || 0;
+        globalMetrics.totalInvestment += metrics.totalInvestment || 0;
+        globalMetrics.fishOutput += metrics.fishOutput || 0;
+
+        const metricValue = metrics[selectedMetric] || 0;
+        projectsByAreaMap.set(areaName, (projectsByAreaMap.get(areaName) || 0) + metricValue);
+
+        if (sector !== "all") {
+          sectorDistributionMap.set(sector, (sectorDistributionMap.get(sector) || 0) + (metrics.totalProjects || 0));
         }
-      });
+      }
     });
+  });
 
-    globalMetrics.totalEmploymentGenerated = Math.floor(globalMetrics.totalProjects * (5 + Math.random() * 10));
-    globalMetrics.directEmploymentMen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.4);
-    globalMetrics.directEmploymentWomen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.3);
-    globalMetrics.indirectEmploymentMen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.2);
-    globalMetrics.indirectEmploymentWomen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.1);
+  globalMetrics.totalEmploymentGenerated = Math.floor(globalMetrics.totalProjects * (5 + Math.random() * 10));
+  globalMetrics.directEmploymentMen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.4);
+  globalMetrics.directEmploymentWomen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.3);
+  globalMetrics.indirectEmploymentMen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.2);
+  globalMetrics.indirectEmploymentWomen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.1);
 
-    globalMetrics.projectsByStateUT = Array.from(projectsByStateUTMap.entries())
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-    globalMetrics.sectorDistribution = Array.from(sectorDistributionMap.entries()).map(([name, value]) => ({
-      name,
-      value,
-    }));
+  globalMetrics.projectsByStateUT = Array.from(projectsByAreaMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
 
-    setGlobalPMMSYMetrics(globalMetrics);
-  }, [mockPMMSYData, selectedGender, selectedSectorPMMSY, selectedFinancialYearPMMSY, polygonData]);
+  globalMetrics.sectorDistribution = Array.from(sectorDistributionMap.entries()).map(([name, value]) => ({
+    name,
+    value,
+  }));
+
+  setGlobalPMMSYMetrics(globalMetrics);
+}, [
+  mockPMMSYData,
+  polygonData,
+  mapView,
+  selectedGender,
+  selectedSectorPMMSY,
+  selectedFinancialYearPMMSY,
+  selectedMetric,
+]);
+
+
 
   // Update PMMSY chart data when filters change
   useEffect(() => {
