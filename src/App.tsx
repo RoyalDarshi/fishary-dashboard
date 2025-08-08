@@ -211,41 +211,78 @@ const App: React.FC = () => {
 
   // Generate mock PMMSY data, aligned with other schemes
   const generateMockPMMSYData = useCallback((areas: GeoJSONFeature[]): Record<string, AreaMetricData> => {
-    const dataMap: Record<string, AreaMetricData> = {};
-    const genders: GenderKey[] = ["male", "female", "transgender"];
-    const years: YearKey[] = ["2021", "2022", "2023", "2024"];
-    const sectors = ["Inland", "Marine"];
+  const dataMap: Record<string, AreaMetricData> = {};
+  const genders: GenderKey[] = ["male", "female", "transgender"];
+  const years: YearKey[] = ["2021", "2022", "2023", "2024"];
+  const sectors = ["Inland", "Marine"];
 
-    areas.forEach((area) => {
-      const areaId = area.properties.shapeID;
-      const areaData: AreaMetricData = {};
-      const regionalBias = 0.1 + Math.random() * 1.9;
+  areas.forEach((area) => {
+    const areaId = area.properties.shapeID;
+    const areaData: AreaMetricData = {};
+    const regionalBias = 0.1 + Math.random() * 1.9;
 
-      genders.forEach((gender) => {
-        years.forEach((year) => {
-          sectors.forEach((sector) => {
-            const key = `PMMSY_${gender}_${year}_${sector}`;
-            const genderMod = gender === "male" ? 1.2 : gender === "female" ? 0.9 : 0.8;
-            const yearMod = year === "2021" ? 0.8 : year === "2022" ? 0.9 : year === "2023" ? 1.0 : 1.1;
-            const sectorMod = sector === "Inland" ? 1.1 : 0.9;
-            const weight = genderMod * yearMod * sectorMod * regionalBias;
+    // Precompute aggregated data for common filter combinations
+    const aggregated: Record<string, MetricValues> = {
+      "PMMSY_all_all_all": { totalProjects: 0, totalInvestment: 0, fishOutput: 0 },
+    };
 
-            const totalProjects = Math.floor(weight * (3 + Math.random() * 1));
-            const totalInvestment = Math.floor(weight * (50000 + Math.random() * 450000));
-            const fishOutput = Math.floor(weight * (5 + Math.random() * 1));
+    genders.forEach((gender) => {
+      years.forEach((year) => {
+        sectors.forEach((sector) => {
+          const key = `PMMSY_${gender}_${year}_${sector}`;
+          const genderMod = gender === "male" ? 1.2 : gender === "female" ? 0.9 : 0.8;
+          const yearMod = year === "2021" ? 0.8 : year === "2022" ? 0.9 : year === "2023" ? 1.0 : 1.1;
+          const sectorMod = sector === "Inland" ? 1.1 : 0.9;
+          const weight = genderMod * yearMod * sectorMod * regionalBias;
 
-            areaData[key] = {
-              totalProjects,
-              totalInvestment,
-              fishOutput,
-            };
-          });
+          const totalProjects = Math.floor(weight * (3 + Math.random() * 1));
+          const totalInvestment = Math.floor(weight * (50000 + Math.random() * 450000));
+          const fishOutput = Math.floor(weight * (5 + Math.random() * 1));
+
+          areaData[key] = {
+            totalProjects,
+            totalInvestment,
+            fishOutput,
+          };
+
+          // Update aggregated data
+          aggregated["PMMSY_all_all_all"].totalProjects! += totalProjects;
+          aggregated["PMMSY_all_all_all"].totalInvestment! += totalInvestment;
+          aggregated["PMMSY_all_all_all"].fishOutput! += fishOutput;
+
+          // Add aggregations for specific filters
+          const genderKey = `PMMSY_${gender}_all_all`;
+          const yearKey = `PMMSY_all_${year}_all`;
+          const sectorKey = `PMMSY_all_all_${sector}`;
+          if (!aggregated[genderKey]) {
+            aggregated[genderKey] = { totalProjects: 0, totalInvestment: 0, fishOutput: 0 };
+          }
+          if (!aggregated[yearKey]) {
+            aggregated[yearKey] = { totalProjects: 0, totalInvestment: 0, fishOutput: 0 };
+          }
+          if (!aggregated[sectorKey]) {
+            aggregated[sectorKey] = { totalProjects: 0, totalInvestment: 0, fishOutput: 0 };
+          }
+          aggregated[genderKey].totalProjects! += totalProjects;
+          aggregated[genderKey].totalInvestment! += totalInvestment;
+          aggregated[genderKey].fishOutput! += fishOutput;
+          aggregated[yearKey].totalProjects! += totalProjects;
+          aggregated[yearKey].totalInvestment! += totalInvestment;
+          aggregated[yearKey].fishOutput! += fishOutput;
+          aggregated[sectorKey].totalProjects! += totalProjects;
+          aggregated[sectorKey].totalInvestment! += totalInvestment;
+          aggregated[sectorKey].fishOutput! += fishOutput;
         });
       });
-      dataMap[areaId] = areaData;
     });
-    return dataMap;
-  }, []);
+
+    // Store aggregated data
+    Object.assign(areaData, aggregated);
+    dataMap[areaId] = areaData;
+  });
+
+  return dataMap;
+}, []);
 
   // Generate mock data for all schemes
   useEffect(() => {
@@ -259,35 +296,31 @@ const App: React.FC = () => {
 
   // Combine metric data based on scheme
   const combinedMetricData = useMemo(() => {
-    if (!mockNonPMMSYData || !mockPMMSYData) return null;
-    if (selectedScheme === "PMMSY") {
-      const filteredData: Record<string, AreaMetricData> = {};
-      Object.entries(mockPMMSYData).forEach(([areaId, areaData]) => {
-        let totalMetrics = { totalProjects: 0, totalInvestment: 0, fishOutput: 0 };
-        Object.entries(areaData).forEach(([key, metrics]) => {
-          const [, gender, year, sector] = key.split("_");
-          const genderMatch = selectedGender === "all" || gender === selectedGender;
-          const yearMatch = selectedFinancialYearPMMSY === "all" || year === selectedFinancialYearPMMSY;
-          const sectorMatch = selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY;
-          if (genderMatch && yearMatch && sectorMatch) {
-            totalMetrics.totalProjects += metrics.totalProjects || 0;
-            totalMetrics.totalInvestment += metrics.totalInvestment || 0;
-            totalMetrics.fishOutput += metrics.fishOutput || 0;
-          }
-        });
-        filteredData[areaId] = { "PMMSY_aggregated": totalMetrics };
-      });
-      return filteredData;
-    }
-    return mockNonPMMSYData;
-  }, [
-    mockNonPMMSYData,
-    mockPMMSYData,
-    selectedScheme,
-    selectedGender,
-    selectedSectorPMMSY,
-    selectedFinancialYearPMMSY,
-  ]);
+  if (!mockNonPMMSYData || !mockPMMSYData) return null;
+
+  if (selectedScheme === "PMMSY") {
+    const filterKey = `PMMSY_${selectedGender}_${selectedFinancialYearPMMSY}_${selectedSectorPMMSY}`;
+    const filteredData: Record<string, AreaMetricData> = {};
+    Object.entries(mockPMMSYData).forEach(([areaId, areaData]) => {
+      // Use precomputed aggregated data if available
+      const metrics = areaData[filterKey] || {
+        totalProjects: 0,
+        totalInvestment: 0,
+        fishOutput: 0,
+      };
+      filteredData[areaId] = { "PMMSY_aggregated": metrics };
+    });
+    return filteredData;
+  }
+  return mockNonPMMSYData;
+}, [
+  mockNonPMMSYData,
+  mockPMMSYData,
+  selectedScheme,
+  selectedGender,
+  selectedSectorPMMSY,
+  selectedFinancialYearPMMSY,
+]);
 
   // Aggregate PMMSY data for charts
   const aggregatePMMSYChartData = useCallback(() => {
