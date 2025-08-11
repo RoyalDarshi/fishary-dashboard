@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import { Map, View } from "ol";
 import { Vector as VectorSource } from "ol/source";
@@ -24,7 +25,9 @@ interface OpenLayersMapProps {
   getFullMetricName: () => string;
   officerNames: Record<string, string>;
   onAreaClick: (details: any | null) => void; // New prop for click handler
+  onDrillDown: (stateName: string) => void;
   mapView: "state" | "sub-district" | "district"; // Updated prop to control map view
+  isDrilledDown: boolean;
 }
 
 const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
@@ -37,7 +40,9 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
   getFullMetricName,
   officerNames,
   onAreaClick,
+  onDrillDown,
   mapView, // Destructure the new mapView prop
+  isDrilledDown,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<Map | null>(null);
@@ -53,6 +58,7 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
   const getFullMetricNameRef = useRef(getFullMetricName);
   const officerNamesRef = useRef(officerNames);
   const onAreaClickRef = useRef(onAreaClick);
+  const onDrillDownRef = useRef(onDrillDown);
 
   // Update refs whenever the corresponding prop/state changes
   useEffect(() => {
@@ -64,6 +70,7 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
     getFullMetricNameRef.current = getFullMetricName;
     officerNamesRef.current = officerNames;
     onAreaClickRef.current = onAreaClick;
+    onDrillDownRef.current = onDrillDown;
   }, [
     metricData,
     selectedMetric,
@@ -73,6 +80,7 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
     getFullMetricName,
     officerNames,
     onAreaClick,
+    onDrillDown,
   ]);
 
   // Initialize map and layers only once
@@ -265,6 +273,8 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
             officer: currentOfficerNames[id] || "N/A",
             metrics: areaAllMetrics,
             level: level, // Pass level to details
+            st_nm: properties.st_nm,
+            district_name: properties.district_name,
           };
           currentOnAreaClick(details);
           // Hide tooltip when popup is active
@@ -276,6 +286,25 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
         }
       } else {
         onAreaClickRef.current(null); // Close the popup if no feature is clicked
+      }
+    });
+
+    // Add double-click for drill-down
+    newMap.on("dblclick", (evt) => {
+      const features = newMap.getFeaturesAtPixel(evt.pixel);
+      let featureToDrill = null;
+
+      if (features && features.length > 0) {
+        featureToDrill = features.find((f) => f.getProperties().level === "state");
+      }
+
+      if (featureToDrill) {
+        const properties = featureToDrill.getProperties();
+        const level = properties.level;
+        if (level === "state") {
+          const stateName = properties.shapeName;
+          onDrillDownRef.current(stateName);
+        }
       }
     });
 
@@ -303,9 +332,20 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
     const features = format.readFeatures(geoJsonData);
     vectorSource.addFeatures(features);
 
+    // Fit to extent if drilled down or returning to state view
+    if (vectorSource.getFeatures().length > 0) {
+      const extent = vectorSource.getExtent();
+      if (isDrilledDown || mapView === "state") {
+        map.getView().fit(extent, {
+          duration: 500,
+          padding: [100, 100, 100, 100],
+        });
+      }
+    }
+
     // Refresh the map size (important if container container changes)
     map.updateSize();
-  }, [map, vectorSource, geoJsonData]); // geoJsonData is a dependency to update features
+  }, [map, vectorSource, geoJsonData, isDrilledDown, mapView]); // geoJsonData is a dependency to update features
 
   // Update vector layer style when selectedMetric, demographicKey, metricData, getColor, or mapView changes
   useEffect(() => {

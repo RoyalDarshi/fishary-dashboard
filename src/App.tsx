@@ -41,7 +41,7 @@ interface GeoJSONFeature {
     shapeID: string;
     shapeName: string;
     level: "state" | "district" | "sub-district";
-    state_name?: string;
+    st_nm?: string;
     district_name?: string;
     subdistrict_name?: string;
   };
@@ -103,6 +103,7 @@ const App: React.FC = () => {
   const [selectedAreaDetails, setSelectedAreaDetails] = useState<any | null>(null);
   const [selectedBarChartCategory, setSelectedBarChartCategory] = useState<"scheme" | "gender" | "year">("scheme");
   const [mapView, setMapView] = useState<"state" | "district" | "sub-district">("state");
+  const [selectedState, setSelectedState] = useState<string | null>(null);
   const [globalPMMSYMetrics, setGlobalPMMSYMetrics] = useState<PMMSYAggregatedData>({
     totalProjects: 0,
     totalInvestment: 0,
@@ -322,9 +323,88 @@ const App: React.FC = () => {
   selectedFinancialYearPMMSY,
 ]);
 
+  // Debounced state updates for PMMSY filters
+  const debounce = (func: (...args: any[]) => void, wait: number) => {
+    let timeout: NodeJS.Timeout;
+    return (...args: any[]) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
+  };
+
+  const debouncedSetSelectedSectorPMMSY = useCallback(debounce(setSelectedSectorPMMSY, 0), []);
+  const debouncedSetSelectedFinancialYearPMMSY = useCallback(debounce(setSelectedFinancialYearPMMSY, 0), []);
+
+  // PMMSY filter options
+  const pmmsySectors = useMemo(() => ["all", "Inland", "Marine"], []);
+  const pmmsyFinancialYears = useMemo(() => ["all", "2021", "2022", "2023", "2024"], []);
+
+  // Fetch GeoJSON and set metric data
+  useEffect(() => {
+    fetch("/indianmap.geojson")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch GeoJSON");
+        return res.json();
+      })
+      .then((data: GeoJSONData) => {
+        const filteredFeatures = data.features.filter((f) => {
+          const type = f.geometry.type;
+          return type === "Polygon" || type === "MultiPolygon";
+        });
+        const filteredGeoJsonData: GeoJSONData = {
+          ...data,
+          features: filteredFeatures,
+        };
+        setPolygonData(filteredGeoJsonData);
+        setMetricData(combinedMetricData);
+      })
+      .catch((err) => {
+        console.error("GeoJSON load error:", err);
+        setError(err.message);
+      });
+  }, [combinedMetricData]);
+
+  // Update selectedMetric when scheme changes
+  useEffect(() => {
+    if (selectedScheme === "PMMSY") {
+      setSelectedMetric("totalProjects");
+    } else {
+      setSelectedMetric("beneficiaries");
+    }
+  }, [selectedScheme]);
+
+  // Filtered GeoJSON data
+  const filteredGeoJsonData = useMemo(() => {
+    if (!polygonData) return null;
+
+    let stateFeaturesToShow = polygonData.features.filter((f) => f.properties.level === "state");
+    let districtFeaturesToShow = polygonData.features.filter((f) => f.properties.level === "district");
+    let subDistrictFeaturesToShow = polygonData.features.filter((f) => f.properties.level === "sub-district");
+
+    if (selectedState) {
+      stateFeaturesToShow = stateFeaturesToShow.filter((f) => f.properties.shapeName === selectedState);
+      districtFeaturesToShow = districtFeaturesToShow.filter((f) => f.properties.st_nm === selectedState);
+      subDistrictFeaturesToShow = subDistrictFeaturesToShow.filter((f) => f.properties.st_nm === selectedState);
+    }
+
+    if (mapView === "state") {
+      return { ...polygonData, features: stateFeaturesToShow };
+    } else if (mapView === "district") {
+      return {
+        ...polygonData,
+        features: [...districtFeaturesToShow, ...stateFeaturesToShow],
+      };
+    } else {
+      return {
+        ...polygonData,
+        features: [...subDistrictFeaturesToShow, ...districtFeaturesToShow, ...stateFeaturesToShow],
+      };
+    }
+  }, [polygonData, mapView, selectedState]);
+
   // Aggregate PMMSY data for charts
   const aggregatePMMSYChartData = useCallback(() => {
-    if (!mockPMMSYData || !polygonData) return;
+    if (!mockPMMSYData || !filteredGeoJsonData) return;
 
     const globalMetrics: PMMSYAggregatedData = {
       totalProjects: 0,
@@ -342,11 +422,8 @@ const App: React.FC = () => {
     const projectsByAreaMap = new Map<string, number>();
     const sectorDistributionMap = new Map<string, number>();
 
-    const featuresForChart = polygonData.features.filter(
-      (f) =>
-        (mapView === "state" && f.properties.level === "state") ||
-        (mapView === "district" && f.properties.level === "district") ||
-        (mapView === "sub-district" && f.properties.level === "sub-district")
+    const featuresForChart = filteredGeoJsonData.features.filter(
+      (f) => f.properties.level === mapView
     );
 
     featuresForChart.forEach((feature) => {
@@ -402,7 +479,7 @@ const App: React.FC = () => {
     setGlobalPMMSYMetrics(globalMetrics);
   }, [
     mockPMMSYData,
-    polygonData,
+    filteredGeoJsonData,
     mapView,
     selectedGender,
     selectedSectorPMMSY,
@@ -416,78 +493,6 @@ const App: React.FC = () => {
       aggregatePMMSYChartData();
     }
   }, [selectedScheme, selectedGender, selectedSectorPMMSY, selectedFinancialYearPMMSY, aggregatePMMSYChartData]);
-
-  // Debounced state updates for PMMSY filters
-  const debounce = (func: (...args: any[]) => void, wait: number) => {
-    let timeout: NodeJS.Timeout;
-    return (...args: any[]) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func(...args), wait);
-    };
-  };
-
-  const debouncedSetSelectedSectorPMMSY = useCallback(debounce(setSelectedSectorPMMSY, 0), []);
-  const debouncedSetSelectedFinancialYearPMMSY = useCallback(debounce(setSelectedFinancialYearPMMSY, 0), []);
-
-  // PMMSY filter options
-  const pmmsySectors = useMemo(() => ["all", "Inland", "Marine"], []);
-  const pmmsyFinancialYears = useMemo(() => ["all", "2021", "2022", "2023", "2024"], []);
-
-  // Fetch GeoJSON and set metric data
-  useEffect(() => {
-    fetch("/indianmap.geojson")
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch GeoJSON");
-        return res.json();
-      })
-      .then((data: GeoJSONData) => {
-        const filteredFeatures = data.features.filter((f) => {
-          const type = f.geometry.type;
-          return type === "Polygon" || type === "MultiPolygon";
-        });
-        const filteredGeoJsonData: GeoJSONData = {
-          ...data,
-          features: filteredFeatures,
-        };
-        setPolygonData(filteredGeoJsonData);
-        setMetricData(combinedMetricData);
-      })
-      .catch((err) => {
-        console.error("GeoJSON load error:", err);
-        setError(err.message);
-      });
-  }, [combinedMetricData]);
-
-  // Update selectedMetric when scheme changes
-  useEffect(() => {
-    if (selectedScheme === "PMMSY") {
-      setSelectedMetric("totalProjects");
-    } else {
-      setSelectedMetric("beneficiaries");
-    }
-  }, [selectedScheme]);
-
-  // Filtered GeoJSON data
-  const filteredGeoJsonData = useMemo(() => {
-    if (!polygonData) return null;
-    const stateFeatures = polygonData.features.filter((f) => f.properties.level === "state");
-    const districtFeatures = polygonData.features.filter((f) => f.properties.level === "district");
-    const subDistrictFeatures = polygonData.features.filter((f) => f.properties.level === "sub-district");
-
-    if (mapView === "state") {
-      return { ...polygonData, features: stateFeatures };
-    } else if (mapView === "district") {
-      return {
-        ...polygonData,
-        features: [...districtFeatures, ...stateFeatures],
-      };
-    } else {
-      return {
-        ...polygonData,
-        features: [...subDistrictFeatures, ...districtFeatures, ...stateFeatures],
-      };
-    }
-  }, [polygonData, mapView]);
 
   // Memoized demographic key
   const demographicKey = useMemo(() => {
@@ -624,22 +629,12 @@ const App: React.FC = () => {
   };
 
   // Full metric name
-  const getFullMetricName = () => {
-    const metricName = getMetricDisplayName(selectedMetric);
-    const filters = [];
-    if (selectedScheme !== "all") filters.push(schemeDisplayNames[selectedScheme]);
-    if (selectedGender !== "all") filters.push(genderDisplayNames[selectedGender]);
-    if (selectedYear !== "all") filters.push(yearDisplayNames[selectedYear]);
-    if (selectedScheme === "PMMSY") {
-      if (selectedSectorPMMSY !== "all") filters.push(selectedSectorPMMSY);
-      if (selectedFinancialYearPMMSY !== "all") filters.push(selectedFinancialYearPMMSY);
-    }
-    const demographicName = filters.length > 0 ? filters.join(", ") : "Overall";
-    return `${metricName} (${demographicName})`;
+  const getFullMetricName = (): string => {
+    return getMetricDisplayName(selectedMetric);
   };
 
-  // Brackets for pie chart legend
-  const brackets = {
+  // Brackets for legend
+  const brackets: Record<string, { label: string; min: number; max: number; color: string }[]> = {
     beneficiaries: [
       { label: "<2K", min: 0, max: 2000, color: "#c4b5fd" },
       { label: "2K-3K", min: 2000, max: 3000, color: "#a78bfa" },
@@ -709,13 +704,10 @@ const App: React.FC = () => {
 
   // Bar chart data for PMMSY
   const pmmsyBarData = useMemo(() => {
-    if (!mockPMMSYData || !polygonData) return { data: [], keys: [], displayNamesMap: {} };
+    if (!mockPMMSYData || !filteredGeoJsonData) return { data: [], keys: [], displayNamesMap: {} };
 
-    const featuresForBarChart = polygonData.features.filter(
-      (f) =>
-        (mapView === "state" && f.properties.level === "state") ||
-        (mapView === "district" && f.properties.level === "district") ||
-        (mapView === "sub-district" && f.properties.level === "sub-district")
+    const featuresForBarChart = filteredGeoJsonData.features.filter(
+      (f) => f.properties.level === mapView
     );
 
     const overallMetricDataForSorting: Record<string, number> = {};
@@ -791,7 +783,7 @@ const App: React.FC = () => {
     return { data, keys, displayNamesMap };
   }, [
     mockPMMSYData,
-    polygonData,
+    filteredGeoJsonData,
     selectedMetric,
     selectedGender,
     selectedFinancialYearPMMSY,
@@ -802,23 +794,20 @@ const App: React.FC = () => {
 
   // Bar chart data for non-PMMSY
   const overallMetricDataForSorting = useMemo(() => {
-    if (!metricData || !polygonData) return {};
+    if (!metricData || !filteredGeoJsonData) return {};
     const overallKey = selectedScheme === "PMMSY" ? "PMMSY_aggregated" : `all_all_all`;
     const data: Record<string, number> = {};
-    polygonData.features.forEach((feature) => {
+    filteredGeoJsonData.features.forEach((feature) => {
       data[feature.properties.shapeID] = metricData[feature.properties.shapeID]?.[overallKey]?.[selectedMetric] ?? 0;
     });
     return data;
-  }, [metricData, polygonData, selectedMetric, selectedScheme]);
+  }, [metricData, filteredGeoJsonData, selectedMetric, selectedScheme]);
 
   const barData = useMemo(() => {
-    if (!metricData || !polygonData) return { data: [], keys: [], displayNamesMap: {} };
+    if (!metricData || !filteredGeoJsonData) return { data: [], keys: [], displayNamesMap: {} };
 
-    const featuresForBarChart = polygonData.features.filter(
-      (f) =>
-        (mapView === "state" && f.properties.level === "state") ||
-        (mapView === "district" && f.properties.level === "district") ||
-        (mapView === "sub-district" && f.properties.level === "sub-district")
+    const featuresForBarChart = filteredGeoJsonData.features.filter(
+      (f) => f.properties.level === mapView
     );
 
     const sortedAreas = featuresForBarChart
@@ -867,7 +856,7 @@ const App: React.FC = () => {
     return { data: rawData, keys, displayNamesMap };
   }, [
     metricData,
-    polygonData,
+    filteredGeoJsonData,
     selectedMetric,
     selectedScheme,
     selectedGender,
@@ -888,7 +877,7 @@ const App: React.FC = () => {
       if (level === "state") {
         return polygonData.features.filter(f => f.properties.level === "state");
       } else if (level === "district") {
-        return polygonData.features.filter(f => f.properties.level === "district" && f.properties.state_name === properties.state_name);
+        return polygonData.features.filter(f => f.properties.level === "district" && f.properties.st_nm === properties.st_nm);
       } else if (level === "sub-district") {
         return polygonData.features.filter(f => f.properties.level === "sub-district" && f.properties.district_name === properties.district_name);
       }
@@ -973,6 +962,37 @@ const App: React.FC = () => {
     }
   };
 
+  // Handle drill down
+  const handleDrillDown = (stateName: string) => {
+    setSelectedState(stateName);
+    setSelectedAreaDetails(null);
+  };
+
+  // Handle back to national view
+  const handleBack = () => {
+    setSelectedState(null);
+    setMapView("state");
+  };
+
+  // Data for state details table
+  const stateDetailsData = useMemo(() => {
+    if (!selectedState || !filteredGeoJsonData || !metricData) return [];
+
+    const districtFeatures = filteredGeoJsonData.features.filter(
+      (f) => f.properties.level === "district"
+    );
+
+    return districtFeatures
+      .map((feature) => {
+        const id = feature.properties.shapeID;
+        const name = feature.properties.district_name || feature.properties.shapeName || "Unknown District";
+        const officer = officerNames[id] || "N/A";
+        const value = metricData[id]?.[demographicKey]?.[selectedMetric] || 0;
+        return { name, officer, value };
+      })
+      .sort((a, b) => b.value - a.value);
+  }, [selectedState, filteredGeoJsonData, metricData, demographicKey, selectedMetric, officerNames]);
+
   // Loading and error states
   if (error) {
     return (
@@ -1041,7 +1061,7 @@ const App: React.FC = () => {
             </div>
             <div className="flex items-center gap-x-2">
               <button
-                onClick={() => setMapView("state")}
+                onClick={() => { setMapView("state"); setSelectedState(null); }}
                 className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                   mapView === "state"
                     ? "bg-blue-600 text-white shadow-md"
@@ -1101,31 +1121,65 @@ const App: React.FC = () => {
         {/* Main Content */}
         <div className="grid grid-cols-5 gap-2">
           <div className="col-span-3 bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 transition-all duration-300 relative">
-            <OpenLayersMap
-              geoJsonData={filteredGeoJsonData}
-              metricData={metricData}
-              selectedMetric={selectedMetric}
-              demographicKey={demographicKey}
-              getColor={getColor}
-              formatMetricValue={formatMetricValue}
-              getFullMetricName={getFullMetricName}
-              officerNames={officerNames}
-              onAreaClick={handleAreaClick}
-              mapView={mapView}
-            />
-            <div className="absolute bottom-4 left-4 bg-white/90 p-3 rounded-lg shadow-md border border-gray-200">
-              <h4 className="text-sm font-semibold mb-2 text-gray-800">
-                {getMetricDisplayName(selectedMetric)} Legend
-              </h4>
-              <div className="space-y-1">
-                {brackets[selectedMetric].map((bracket, index) => (
-                  <div key={index} className="flex items-center">
-                    <div className="w-4 h-4 mr-2 rounded-sm" style={{ backgroundColor: bracket.color }}></div>
-                    <span className="text-xs text-gray-700">{bracket.label}</span>
-                  </div>
-                ))}
+            {selectedState ? (
+              <div className="p-4">
+                <button
+                  onClick={handleBack}
+                  className="mb-4 bg-white px-4 py-2 rounded-md shadow-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+                >
+                  Back to National View
+                </button>
+                <h2 className="text-xl font-bold mb-4">Details for {selectedState}</h2>
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="border p-2 text-left">District Name</th>
+                      <th className="border p-2 text-left">Officer</th>
+                      <th className="border p-2 text-left">{getMetricDisplayName(selectedMetric)}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stateDetailsData.map((district, index) => (
+                      <tr key={index}>
+                        <td className="border p-2">{district.name}</td>
+                        <td className="border p-2">{district.officer}</td>
+                        <td className="border p-2">{formatMetricValue(selectedMetric, district.value)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
+            ) : (
+              <OpenLayersMap
+                geoJsonData={filteredGeoJsonData}
+                metricData={metricData}
+                selectedMetric={selectedMetric}
+                demographicKey={demographicKey}
+                getColor={getColor}
+                formatMetricValue={formatMetricValue}
+                getFullMetricName={getFullMetricName}
+                officerNames={officerNames}
+                onAreaClick={handleAreaClick}
+                onDrillDown={handleDrillDown}
+                mapView={mapView}
+                isDrilledDown={!!selectedState}
+              />
+            )}
+            {!selectedState && (
+              <div className="absolute bottom-4 left-4 bg-white/90 p-3 rounded-lg shadow-md border border-gray-200">
+                <h4 className="text-sm font-semibold mb-2 text-gray-800">
+                  {getMetricDisplayName(selectedMetric)} Legend
+                </h4>
+                <div className="space-y-1">
+                  {brackets[selectedMetric].map((bracket, index) => (
+                    <div key={index} className="flex items-center">
+                      <div className="w-4 h-4 mr-2 rounded-sm" style={{ backgroundColor: bracket.color }}></div>
+                      <span className="text-xs text-gray-700">{bracket.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <div className={`${selectedAreaDetails ? "col-span-2" : "col-span-2"} space-y-2 ${selectedAreaDetails ? "block" : "hidden"} lg:block`}>
             {selectedScheme === "PMMSY" ? (
