@@ -59,6 +59,8 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
   const officerNamesRef = useRef(officerNames);
   const onAreaClickRef = useRef(onAreaClick);
   const onDrillDownRef = useRef(onDrillDown);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+const lastClickedFeatureRef = useRef<any>(null);
 
   // Update refs whenever the corresponding prop/state changes
   useEffect(() => {
@@ -249,7 +251,9 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
         featureToClick &&
         featureToClick.getGeometry()?.getType() !== "Point"
       ) {
-        const properties = featureToClick.getProperties();
+        lastClickedFeatureRef.current = featureToClick;
+        clickTimeoutRef.current = setTimeout(() => {
+          const properties = featureToClick.getProperties();
         const id = properties.shapeID;
         const name = properties.shapeName || "Unknown Area";
         const level = properties.level;
@@ -284,36 +288,44 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
         } else {
           currentOnAreaClick(null); // Close the popup if a non-relevant feature is clicked
         }
-      } else {
-        onAreaClickRef.current(null); // Close the popup if no feature is clicked
-      }
+    }, 300); // 300ms delay to detect double-click
+  }
     });
 
     // Add double-click for drill-down
     newMap.on("dblclick", (evt) => {
-      const features = newMap.getFeaturesAtPixel(evt.pixel);
-      let featureToDrill = null;
+  // Clear single-click timeout
+  if (clickTimeoutRef.current) {
+    clearTimeout(clickTimeoutRef.current);
+    clickTimeoutRef.current = null;
+  }
 
-      if (features && features.length > 0) {
-        featureToDrill = features.find((f) => f.getProperties().level === "state");
-      }
+  const features = newMap.getFeaturesAtPixel(evt.pixel);
+  let featureToDrill = null;
 
-      if (featureToDrill) {
-        const properties = featureToDrill.getProperties();
-        const level = properties.level;
-        if (level === "state") {
-          const stateName = properties.shapeName;
-          onDrillDownRef.current(stateName);
-        }
-      }
-    });
+  if (features && features.length > 0) {
+    featureToDrill = features.find((f) => f.getProperties().level === "state");
+  }
+
+  if (featureToDrill) {
+    const properties = featureToDrill.getProperties();
+    const level = properties.level;
+    if (level === "state") {
+      const stateName = properties.shapeName;
+      onDrillDownRef.current(stateName);
+    }
+  }
+});
 
     setMap(newMap);
 
     // Cleanup function for map
     return () => {
-      newMap.setTarget(undefined);
-    };
+  newMap.setTarget(undefined);
+  if (clickTimeoutRef.current) {
+    clearTimeout(clickTimeoutRef.current);
+  }
+};
   }, []); // Empty dependency array: this effect runs only once on mount
 
   // Update map data (features) when geoJsonData changes

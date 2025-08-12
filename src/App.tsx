@@ -965,11 +965,9 @@ const App: React.FC = () => {
   };
 
   // Handle drill down
-  const handleDrillDown = (stateName: string, areaDetails?: any) => {
-  if (areaDetails) {
-    handleAreaClick(areaDetails); // prepares and sets selectedAreaDetails
-  }
+  const handleDrillDown = (stateName: string) => {
   setSelectedState(stateName);
+  setSelectedAreaDetails(null); // Ensure popup doesn't open
 };
 
 
