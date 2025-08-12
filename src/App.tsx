@@ -633,52 +633,55 @@ const App: React.FC = () => {
     return getMetricDisplayName(selectedMetric);
   };
 
-  // Brackets for legend
-  const brackets: Record<string, { label: string; min: number; max: number; color: string }[]> = {
+  // Brackets for pie chart (distribution by metric range)
+  const brackets = {
     beneficiaries: [
-      { label: "<2K", min: 0, max: 2000, color: "#c4b5fd" },
-      { label: "2K-3K", min: 2000, max: 3000, color: "#a78bfa" },
-      { label: "3K-4K", min: 3000, max: 4000, color: "#8b5cf6" },
-      { label: ">=4K", min: 4000, max: Infinity, color: "#6366f1" },
+      { min: 4000, max: Infinity, label: "4000+", color: "#6366f1" },
+      { min: 3000, max: 4000, label: "3000-4000", color: "#8b5cf6" },
+      { min: 2000, max: 3000, label: "2000-3000", color: "#a78bfa" },
+      { min: 0, max: 2000, label: "0-2000", color: "#c4b5fd" },
     ],
     funds: [
-      { label: "<30L", min: 0, max: 3000000, color: "#6ee7b7" },
-      { label: "30L-50L", min: 3000000, max: 5000000, color: "#34d399" },
-      { label: "50L-80L", min: 5000000, max: 8000000, color: "#10b981" },
-      { label: ">=80L", min: 8000000, max: Infinity, color: "#059669" },
+      { min: 8000000, max: Infinity, label: "80L+", color: "#059669" },
+      { min: 5000000, max: 8000000, label: "50L-80L", color: "#10b981" },
+      { min: 3000000, max: 5000000, label: "30L-50L", color: "#34d399" },
+      { min: 0, max: 3000000, label: "0-30L", color: "#6ee7b7" },
     ],
     registrations: [
-      { label: "<4K", min: 0, max: 4000, color: "#fed7aa" },
-      { label: "4K-6K", min: 4000, max: 6000, color: "#fdba74" },
-      { label: "6K-8K", min: 6000, max: 8000, color: "#fb923c" },
-      { label: ">=8K", min: 8000, max: Infinity, color: "#f97316" },
+      { min: 8000, max: Infinity, label: "8000+", color: "#f97316" },
+      { min: 6000, max: 8000, label: "6000-8000", color: "#fb923c" },
+      { min: 4000, max: 6000, label: "4000-6000", color: "#fdba74" },
+      { min: 0, max: 4000, label: "0-4000", color: "#fed7aa" },
     ],
     totalProjects: [
-      { label: "<30", min: 0, max: 30, color: "#c4b5fd" },
-      { label: "30-50", min: 30, max: 50, color: "#a78bfa" },
-      { label: "50-80", min: 50, max: 80, color: "#8b5cf6" },
-      { label: ">=80", min: 80, max: Infinity, color: "#6366f1" },
+      { min: 80, max: Infinity, label: "80+", color: "#6366f1" },
+      { min: 50, max: 80, label: "50-80", color: "#8b5cf6" },
+      { min: 30, max: 50, label: "30-50", color: "#a78bfa" },
+      { min: 0, max: 30, label: "0-30", color: "#c4b5fd" },
     ],
     totalInvestment: [
-      { label: "<10L", min: 0, max: 1000000, color: "#6ee7b7" },
-      { label: "10L-25L", min: 1000000, max: 2500000, color: "#34d399" },
-      { label: "25L-40L", min: 2500000, max: 4000000, color: "#10b981" },
-      { label: ">=40L", min: 4000000, max: Infinity, color: "#059669" },
+      { min: 4000000, max: Infinity, label: "40L+", color: "#059669" },
+      { min: 2500000, max: 4000000, label: "25L-40L", color: "#10b981" },
+      { min: 1000000, max: 2500000, label: "10L-25L", color: "#34d399" },
+      { min: 0, max: 1000000, label: "0-10L", color: "#6ee7b7" },
     ],
     fishOutput: [
-      { label: "<50T", min: 0, max: 50, color: "#fed7aa" },
-      { label: "50-100T", min: 50, max: 100, color: "#fdba74" },
-      { label: "100-150T", min: 100, max: 150, color: "#fb923c" },
-      { label: ">=150T", min: 150, max: Infinity, color: "#f97316" },
+      { min: 150, max: Infinity, label: "150+", color: "#f97316" },
+      { min: 100, max: 150, label: "100-150", color: "#fb923c" },
+      { min: 50, max: 100, label: "50-100", color: "#fdba74" },
+      { min: 0, max: 50, label: "0-50", color: "#fed7aa" },
     ],
   };
 
-  // Pie chart data
+  // Pie chart data (distribution by metric range)
   const pieData = useMemo(() => {
-    if (!metricData || !filteredGeoJsonData) return [];
+    if (!metricData || !filteredGeoJsonData || !brackets[selectedMetric]) return [];
     const currentBrackets = brackets[selectedMetric];
-    const counts = currentBrackets.map((bracket) => ({ ...bracket, count: 0 }));
-
+    const counts = currentBrackets.map(() => ({ count: 0, label: "", color: "" }));
+    currentBrackets.forEach((bracket, index) => {
+      counts[index].label = bracket.label;
+      counts[index].color = bracket.color;
+    });
     filteredGeoJsonData.features
       .filter(
         (f) =>
@@ -825,7 +828,7 @@ const App: React.FC = () => {
 
     switch (selectedBarChartCategory) {
       case "scheme":
-        keys = ["PMMKSS", "PMMSY", "KCC", "NFDP"];
+        keys = ["PMMKSS", "KCC", "NFDP"]; // Removed PMMSY to fix bug
         getDemographicKey = (areaId, key) => `${key}_${selectedGender}_${selectedYear}`;
         displayNamesMap = schemeDisplayNames;
         break;
@@ -974,24 +977,84 @@ const App: React.FC = () => {
     setMapView("state");
   };
 
-  // Data for state details table
-  const stateDetailsData = useMemo(() => {
-    if (!selectedState || !filteredGeoJsonData || !metricData) return [];
+  // Data for state category breakdown table
+  const categoryBreakdownData = useMemo(() => {
+    if (!selectedState || !filteredGeoJsonData || !combinedMetricData || !mockNonPMMSYData || !mockPMMSYData) return [];
 
     const districtFeatures = filteredGeoJsonData.features.filter(
       (f) => f.properties.level === "district"
     );
 
-    return districtFeatures
-      .map((feature) => {
-        const id = feature.properties.shapeID;
-        const name = feature.properties.district_name || feature.properties.shapeName || "Unknown District";
-        const officer = officerNames[id] || "N/A";
-        const value = metricData[id]?.[demographicKey]?.[selectedMetric] || 0;
-        return { name, officer, value };
-      })
-      .sort((a, b) => b.value - a.value);
-  }, [selectedState, filteredGeoJsonData, metricData, demographicKey, selectedMetric, officerNames]);
+    const districtIds = districtFeatures.map((f) => f.properties.shapeID);
+
+    let categories: string[] = [];
+    let displayNames: Record<string, string> = {};
+    let getDemographicKey: (key: string) => string;
+    let dataSource: Record<string, AreaMetricData> | null = null;
+
+    if (selectedScheme === "PMMSY") {
+      dataSource = mockPMMSYData;
+      if (selectedBarChartCategory === "gender") {
+        categories = ["male", "female", "transgender"];
+        displayNames = genderDisplayNames;
+        getDemographicKey = (key) => `PMMSY_${key}_${selectedFinancialYearPMMSY}_${selectedSectorPMMSY}`;
+      } else if (selectedBarChartCategory === "year") {
+        categories = ["2021", "2022", "2023", "2024"];
+        displayNames = yearDisplayNames;
+        getDemographicKey = (key) => `PMMSY_${selectedGender}_${key}_${selectedSectorPMMSY}`;
+      } else { // scheme (sectors for PMMSY)
+        categories = ["Inland", "Marine"];
+        displayNames = { Inland: "Inland", Marine: "Marine" };
+        getDemographicKey = (key) => `PMMSY_${selectedGender}_${selectedFinancialYearPMMSY}_${key}`;
+      }
+    } else {
+      dataSource = mockNonPMMSYData;
+      if (selectedBarChartCategory === "gender") {
+        categories = ["male", "female", "transgender"];
+        displayNames = genderDisplayNames;
+        getDemographicKey = (key) => `${selectedScheme}_${key}_${selectedYear}`;
+      } else if (selectedBarChartCategory === "year") {
+        categories = ["2021", "2022", "2023", "2024"];
+        displayNames = yearDisplayNames;
+        getDemographicKey = (key) => `${selectedScheme}_${selectedGender}_${key}`;
+      } else { // scheme
+        categories = ["PMMKSS", "KCC", "NFDP"];
+        displayNames = schemeDisplayNames;
+        getDemographicKey = (key) => `${key}_${selectedGender}_${selectedYear}`;
+      }
+    }
+
+    if (!dataSource) return [];
+
+    const totals: Record<string, number> = {};
+
+    categories.forEach((cat) => {
+      const fullKey = getDemographicKey(cat);
+      let total = 0;
+      districtIds.forEach((id) => {
+        total += dataSource?.[id]?.[fullKey]?.[selectedMetric as keyof MetricValues] || 0;
+      });
+      totals[cat] = total;
+    });
+
+    return categories.map((cat) => ({
+      category: displayNames[cat] || cat,
+      value: totals[cat],
+    }));
+  }, [
+    selectedState,
+    filteredGeoJsonData,
+    combinedMetricData,
+    mockNonPMMSYData,
+    mockPMMSYData,
+    selectedScheme,
+    selectedBarChartCategory,
+    selectedGender,
+    selectedYear,
+    selectedSectorPMMSY,
+    selectedFinancialYearPMMSY,
+    selectedMetric,
+  ]);
 
   // Loading and error states
   if (error) {
@@ -1129,21 +1192,19 @@ const App: React.FC = () => {
                 >
                   Back to National View
                 </button>
-                <h2 className="text-xl font-bold mb-4">Details for {selectedState}</h2>
+                <h2 className="text-xl font-bold mb-4">Data Breakdown by {selectedBarChartCategory.charAt(0).toUpperCase() + selectedBarChartCategory.slice(1)} for {selectedState}</h2>
                 <table className="w-full border-collapse">
                   <thead>
                     <tr>
-                      <th className="border p-2 text-left">District Name</th>
-                      <th className="border p-2 text-left">Officer</th>
+                      <th className="border p-2 text-left">{selectedBarChartCategory.charAt(0).toUpperCase() + selectedBarChartCategory.slice(1)}</th>
                       <th className="border p-2 text-left">{getMetricDisplayName(selectedMetric)}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {stateDetailsData.map((district, index) => (
+                    {categoryBreakdownData.map((item, index) => (
                       <tr key={index}>
-                        <td className="border p-2">{district.name}</td>
-                        <td className="border p-2">{district.officer}</td>
-                        <td className="border p-2">{formatMetricValue(selectedMetric, district.value)}</td>
+                        <td className="border p-2">{item.category}</td>
+                        <td className="border p-2">{item.value}</td>
                       </tr>
                     ))}
                   </tbody>
