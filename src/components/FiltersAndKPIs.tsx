@@ -73,9 +73,7 @@ const FiltersAndKPIs: React.FC<FiltersAndKPIsProps> = ({
       {/* Filters */}
       <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 mb-2">
         <div
-          className={`${
-            selectedScheme === "PMMSY" ? "grid-cols-3" : "grid-cols-3"
-          } grid gap-4`}
+          className={`grid grid-cols-3 gap-4`}
         >
           <div className="space-y-1">
             <label className="block text-sm font-medium text-gray-700">
@@ -169,10 +167,10 @@ const FiltersAndKPIs: React.FC<FiltersAndKPIsProps> = ({
 
       {/* KPIs */}
       {selectedScheme === "PMMSY" ? (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
-          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-6 hover:shadow-xl transition-shadow">
+        <div className="grid grid-cols-4 gap-2 mb-2">
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-4 hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4 ml-8">
+              <div className="flex items-center space-x-4">
                 <p className="text-xl font-medium text-gray-600">Total Projects</p>
                 <p className="text-4xl font-bold text-blue-600">
                   {globalPMMSYMetrics.totalProjects.toLocaleString()}
@@ -183,9 +181,9 @@ const FiltersAndKPIs: React.FC<FiltersAndKPIsProps> = ({
               </div>
             </div>
           </div>
-          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-6 hover:shadow-xl transition-shadow">
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-4 hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4 ml-8">
+              <div className="flex items-center space-x-4">
                 <p className="text-xl font-medium text-gray-600">Total Investment</p>
                 <p className="text-4xl font-bold text-green-600">
                   {formatMetricValue("funds", globalPMMSYMetrics.totalInvestment)}
@@ -196,9 +194,9 @@ const FiltersAndKPIs: React.FC<FiltersAndKPIsProps> = ({
               </div>
             </div>
           </div>
-          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-6 hover:shadow-xl transition-shadow">
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-4 hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4 ml-8">
+              <div className="flex items-center space-x-4">
                 <p className="text-xl font-medium text-gray-600">Fish Output (MT)</p>
                 <p className="text-4xl font-bold text-purple-600">
                   {globalPMMSYMetrics.fishOutput.toFixed(2)}
@@ -209,9 +207,9 @@ const FiltersAndKPIs: React.FC<FiltersAndKPIsProps> = ({
               </div>
             </div>
           </div>
-          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-6 hover:shadow-xl transition-shadow">
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 px-4 hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4 ml-8">
+              <div className="flex items-center space-x-4">
                 <p className="text-xl font-medium text-gray-600">Employment Generated</p>
                 <p className="text-4xl font-bold text-orange-600">
                   {globalPMMSYMetrics.totalEmploymentGenerated.toLocaleString()}

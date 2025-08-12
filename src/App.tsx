@@ -9,7 +9,6 @@ import {
   TopAreasBarChart,
   EmploymentBarChart,
 } from "./components/Charts";
-import pmmsyData from "./data/pmmsyData.json";
 
 // Interface for metric values
 interface MetricValues {
@@ -966,10 +965,13 @@ const App: React.FC = () => {
   };
 
   // Handle drill down
-  const handleDrillDown = (stateName: string) => {
-    setSelectedState(stateName);
-    setSelectedAreaDetails(null);
-  };
+  const handleDrillDown = (stateName: string, areaDetails?: any) => {
+  if (areaDetails) {
+    handleAreaClick(areaDetails); // prepares and sets selectedAreaDetails
+  }
+  setSelectedState(stateName);
+};
+
 
   // Handle back to national view
   const handleBack = () => {
@@ -1185,30 +1187,82 @@ const App: React.FC = () => {
         <div className="grid grid-cols-5 gap-2">
           <div className="col-span-3 bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 transition-all duration-300 relative">
             {selectedState ? (
-              <div className="p-4">
+              <div className="p-4 space-y-4">
                 <button
                   onClick={handleBack}
                   className="mb-4 bg-white px-4 py-2 rounded-md shadow-md text-sm font-medium text-gray-700 hover:bg-gray-100"
                 >
                   Back to National View
                 </button>
-                <h2 className="text-xl font-bold mb-4">Data Breakdown by {selectedBarChartCategory.charAt(0).toUpperCase() + selectedBarChartCategory.slice(1)} for {selectedState}</h2>
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="border p-2 text-left">{selectedBarChartCategory.charAt(0).toUpperCase() + selectedBarChartCategory.slice(1)}</th>
-                      <th className="border p-2 text-left">{getMetricDisplayName(selectedMetric)}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {categoryBreakdownData.map((item, index) => (
-                      <tr key={index}>
-                        <td className="border p-2">{item.category}</td>
-                        <td className="border p-2">{item.value}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                {selectedAreaDetails && (
+      <div className="bg-white p-4 rounded-lg shadow space-y-2">
+        <h2 className="text-xl font-bold mb-4">{selectedAreaDetails.name}</h2>
+
+        {selectedScheme === "PMMSY" ? (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="font-semibold">Total Projects</p>
+              <p>{formatMetricValue("totalProjects", selectedAreaDetails.pmmsyMetrics.totalProjects)}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Total Investment</p>
+              <p>{formatMetricValue("totalInvestment", selectedAreaDetails.pmmsyMetrics.totalInvestment)}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Fish Output</p>
+              <p>{formatMetricValue("fishOutput", selectedAreaDetails.pmmsyMetrics.fishOutput)}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Total Employment Generated</p>
+              <p>{formatMetricValue("totalProjects", selectedAreaDetails.pmmsyMetrics.totalEmploymentGenerated)}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Direct Employment (Men)</p>
+              <p>{formatMetricValue("totalProjects", selectedAreaDetails.pmmsyMetrics.directEmploymentMen)}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Direct Employment (Women)</p>
+              <p>{formatMetricValue("totalProjects", selectedAreaDetails.pmmsyMetrics.directEmploymentWomen)}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Indirect Employment (Men)</p>
+              <p>{formatMetricValue("totalProjects", selectedAreaDetails.pmmsyMetrics.indirectEmploymentMen)}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Indirect Employment (Women)</p>
+              <p>{formatMetricValue("totalProjects", selectedAreaDetails.pmmsyMetrics.indirectEmploymentWomen)}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="font-semibold">Total Funds Allocated</p>
+              <p>{formatMetricValue("funds", selectedAreaDetails.metrics.funds)}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Funds Utilized</p>
+              <p>{formatMetricValue("funds_used", selectedAreaDetails.metrics.funds_used)}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Total Beneficiaries</p>
+              <p>{formatMetricValue("beneficiaries", selectedAreaDetails.metrics.beneficiaries)}</p>
+            </div>
+            <div>
+              <p className="font-semibold">New Beneficiaries (Last 24h)</p>
+              <p>{formatMetricValue("beneficiaries_last_24h", selectedAreaDetails.metrics.beneficiaries_last_24h)}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Total Registrations</p>
+              <p>{formatMetricValue("registrations", selectedAreaDetails.metrics.registrations)}</p>
+            </div>
+            <div>
+              <p className="font-semibold">New Registrations (Last 24h)</p>
+              <p>{formatMetricValue("registrations_last_24h", selectedAreaDetails.metrics.registrations_last_24h)}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    )}
               </div>
             ) : (
               <OpenLayersMap
