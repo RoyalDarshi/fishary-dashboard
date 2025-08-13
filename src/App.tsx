@@ -871,6 +871,11 @@ const App: React.FC = () => {
 
   const { data: barChartData, keys: barChartKeys, displayNamesMap: barChartDisplayNamesMap } = barData;
 
+  const handleSelectedScheme = (scheme: SchemeKey) => {
+    setSelectedScheme(scheme);
+    setSelectedState(null);
+  }
+
   // Handle area click
   const handleAreaClick = (areaDetails: any) => {
     if (!polygonData || !metricData) return;
@@ -1258,7 +1263,7 @@ const App: React.FC = () => {
           selectedMetric={selectedMetric}
           setSelectedMetric={setSelectedMetric}
           selectedScheme={selectedScheme}
-          setSelectedScheme={setSelectedScheme}
+          setSelectedScheme={handleSelectedScheme}
           selectedGender={selectedGender}
           setSelectedGender={setSelectedGender}
           selectedYear={selectedYear}
