@@ -100,6 +100,7 @@ const App: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<YearKey>("all");
   const [error, setError] = useState<string | null>(null);
   const [selectedAreaDetails, setSelectedAreaDetails] = useState<any | null>(null);
+  const [drilledAreaDetails, setDrilledAreaDetails] = useState<any | null>(null);
   const [selectedBarChartCategory, setSelectedBarChartCategory] = useState<"scheme" | "gender" | "year">("scheme");
   const [mapView, setMapView] = useState<"state" | "district" | "sub-district">("state");
   const [selectedState, setSelectedState] = useState<string | null>(null);
@@ -965,9 +966,102 @@ const App: React.FC = () => {
   };
 
   // Handle drill down
-  const handleDrillDown = (stateName: string) => {
-  setSelectedState(stateName);
-  setSelectedAreaDetails(null); // Ensure popup doesn't open
+  const handleDrillDown = (areaDetails: any) => {
+    console.log("Drill down to area:", areaDetails);
+  // setSelectedState(stateName);
+    // setSelectedAreaDetails(null); // Ensure popup doesn't open
+    if (!polygonData || !metricData) return;
+
+    // Determine the group for averaging based on area type
+    const getAverageGroup = (level: string, properties: any) => {
+      if (level === "state") {
+        return polygonData.features.filter(f => f.properties.level === "state");
+      } else if (level === "district") {
+        return polygonData.features.filter(f => f.properties.level === "district" && f.properties.st_nm === properties.st_nm);
+      } else if (level === "sub-district") {
+        return polygonData.features.filter(f => f.properties.level === "sub-district" && f.properties.district_name === properties.district_name);
+      }
+      return [];
+    };
+
+    const group = getAverageGroup(areaDetails.level, areaDetails);
+    const metricSums: { [key: string]: number } = {};
+    const count = group.length;
+
+    group.forEach(feature => {
+      const areaMetrics = metricData[feature.properties.shapeID]?.[demographicKey];
+      if (areaMetrics) {
+        Object.keys(areaMetrics).forEach(key => {
+          metricSums[key] = (metricSums[key] || 0) + (areaMetrics[key] || 0);
+        });
+      }
+    });
+
+    const averages: { [key: string]: number } = {};
+    Object.keys(metricSums).forEach(key => {
+      averages[key] = count > 0 ? metricSums[key] / count : 0;
+    });
+
+    if (selectedScheme === "PMMSY") {
+      const metrics = metricData[areaDetails.id]?.[demographicKey] || {
+        totalProjects: 0,
+        totalInvestment: 0,
+        fishOutput: 0,
+      };
+      const totalEmploymentGenerated = Math.floor(metrics.totalProjects * (5 + Math.random() * 10));
+      const pmmsyMetrics: PMMSYAggregatedData = {
+        totalProjects: metrics.totalProjects || 0,
+        totalInvestment: metrics.totalInvestment || 0,
+        fishOutput: metrics.fishOutput || 0,
+        totalEmploymentGenerated,
+        directEmploymentMen: Math.floor(totalEmploymentGenerated * 0.4),
+        directEmploymentWomen: Math.floor(totalEmploymentGenerated * 0.3),
+        indirectEmploymentMen: Math.floor(totalEmploymentGenerated * 0.2),
+        indirectEmploymentWomen: Math.floor(totalEmploymentGenerated * 0.1),
+        projectsByStateUT: [],
+        sectorDistribution: [],
+      };
+      const averageTotalEmploymentGenerated = Math.floor(averages.totalProjects * (5 + Math.random() * 10));
+      const pmmsyAverages: PMMSYAggregatedData = {
+        totalProjects: averages.totalProjects || 0,
+        totalInvestment: averages.totalInvestment || 0,
+        fishOutput: averages.fishOutput || 0,
+        totalEmploymentGenerated: averageTotalEmploymentGenerated,
+        directEmploymentMen: Math.floor(averageTotalEmploymentGenerated * 0.4),
+        directEmploymentWomen: Math.floor(averageTotalEmploymentGenerated * 0.3),
+        indirectEmploymentMen: Math.floor(averageTotalEmploymentGenerated * 0.2),
+        indirectEmploymentWomen: Math.floor(averageTotalEmploymentGenerated * 0.1),
+        projectsByStateUT: [],
+        sectorDistribution: [],
+      };
+      setSelectedState(areaDetails.name|| "Unknown Area")
+      setDrilledAreaDetails({
+        ...areaDetails,
+        name: areaDetails.name || "Unknown Area",
+        officer: officerNames[areaDetails.id] || "Unknown Officer",
+        level: areaDetails.level || "Unknown",
+        pmmsyMetrics,
+        pmmsyAverages,
+      });
+    } else {
+      const metrics = metricData[areaDetails.id]?.[demographicKey] || {
+        beneficiaries: 0,
+        funds: 0,
+        registrations: 0,
+        funds_used: 0,
+        beneficiaries_last_24h: 0,
+        registrations_last_24h: 0,
+      };
+      setSelectedState(areaDetails.name|| "Unknown Area")
+      setDrilledAreaDetails({
+        ...areaDetails,
+        name: areaDetails.name || "Unknown Area",
+        officer: officerNames[areaDetails.id] || "Unknown Officer",
+        level: areaDetails.level || "Unknown",
+        metrics,
+        averages,
+      });
+    }
 };
 
 
@@ -1192,70 +1286,70 @@ const App: React.FC = () => {
                 >
                   Back to National View
                 </button>
-                {selectedAreaDetails && (
+                {drilledAreaDetails && (
       <div className="bg-white p-4 rounded-lg shadow space-y-2">
-        <h2 className="text-xl font-bold mb-4">{selectedAreaDetails.name}</h2>
+        <h2 className="text-xl font-bold mb-4">{drilledAreaDetails.name}</h2>
 
         {selectedScheme === "PMMSY" ? (
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="font-semibold">Total Projects</p>
-              <p>{formatMetricValue("totalProjects", selectedAreaDetails.pmmsyMetrics.totalProjects)}</p>
+              <p>{formatMetricValue("totalProjects", drilledAreaDetails.pmmsyMetrics.totalProjects)}</p>
             </div>
             <div>
               <p className="font-semibold">Total Investment</p>
-              <p>{formatMetricValue("totalInvestment", selectedAreaDetails.pmmsyMetrics.totalInvestment)}</p>
+              <p>{formatMetricValue("totalInvestment", drilledAreaDetails.pmmsyMetrics.totalInvestment)}</p>
             </div>
             <div>
               <p className="font-semibold">Fish Output</p>
-              <p>{formatMetricValue("fishOutput", selectedAreaDetails.pmmsyMetrics.fishOutput)}</p>
+              <p>{formatMetricValue("fishOutput", drilledAreaDetails.pmmsyMetrics.fishOutput)}</p>
             </div>
             <div>
               <p className="font-semibold">Total Employment Generated</p>
-              <p>{formatMetricValue("totalProjects", selectedAreaDetails.pmmsyMetrics.totalEmploymentGenerated)}</p>
+              <p>{formatMetricValue("totalProjects", drilledAreaDetails.pmmsyMetrics.totalEmploymentGenerated)}</p>
             </div>
             <div>
               <p className="font-semibold">Direct Employment (Men)</p>
-              <p>{formatMetricValue("totalProjects", selectedAreaDetails.pmmsyMetrics.directEmploymentMen)}</p>
+              <p>{formatMetricValue("totalProjects", drilledAreaDetails.pmmsyMetrics.directEmploymentMen)}</p>
             </div>
             <div>
               <p className="font-semibold">Direct Employment (Women)</p>
-              <p>{formatMetricValue("totalProjects", selectedAreaDetails.pmmsyMetrics.directEmploymentWomen)}</p>
+              <p>{formatMetricValue("totalProjects", drilledAreaDetails.pmmsyMetrics.directEmploymentWomen)}</p>
             </div>
             <div>
               <p className="font-semibold">Indirect Employment (Men)</p>
-              <p>{formatMetricValue("totalProjects", selectedAreaDetails.pmmsyMetrics.indirectEmploymentMen)}</p>
+              <p>{formatMetricValue("totalProjects", drilledAreaDetails.pmmsyMetrics.indirectEmploymentMen)}</p>
             </div>
             <div>
               <p className="font-semibold">Indirect Employment (Women)</p>
-              <p>{formatMetricValue("totalProjects", selectedAreaDetails.pmmsyMetrics.indirectEmploymentWomen)}</p>
+              <p>{formatMetricValue("totalProjects", drilledAreaDetails.pmmsyMetrics.indirectEmploymentWomen)}</p>
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="font-semibold">Total Funds Allocated</p>
-              <p>{formatMetricValue("funds", selectedAreaDetails.metrics.funds)}</p>
+              <p>{formatMetricValue("funds", drilledAreaDetails.metrics.funds)}</p>
             </div>
             <div>
               <p className="font-semibold">Funds Utilized</p>
-              <p>{formatMetricValue("funds_used", selectedAreaDetails.metrics.funds_used)}</p>
+              <p>{formatMetricValue("funds_used", drilledAreaDetails.metrics.funds_used)}</p>
             </div>
             <div>
               <p className="font-semibold">Total Beneficiaries</p>
-              <p>{formatMetricValue("beneficiaries", selectedAreaDetails.metrics.beneficiaries)}</p>
+              <p>{formatMetricValue("beneficiaries", drilledAreaDetails.metrics.beneficiaries)}</p>
             </div>
             <div>
               <p className="font-semibold">New Beneficiaries (Last 24h)</p>
-              <p>{formatMetricValue("beneficiaries_last_24h", selectedAreaDetails.metrics.beneficiaries_last_24h)}</p>
+              <p>{formatMetricValue("beneficiaries_last_24h", drilledAreaDetails.metrics.beneficiaries_last_24h)}</p>
             </div>
             <div>
               <p className="font-semibold">Total Registrations</p>
-              <p>{formatMetricValue("registrations", selectedAreaDetails.metrics.registrations)}</p>
+              <p>{formatMetricValue("registrations", drilledAreaDetails.metrics.registrations)}</p>
             </div>
             <div>
               <p className="font-semibold">New Registrations (Last 24h)</p>
-              <p>{formatMetricValue("registrations_last_24h", selectedAreaDetails.metrics.registrations_last_24h)}</p>
+              <p>{formatMetricValue("registrations_last_24h", drilledAreaDetails.metrics.registrations_last_24h)}</p>
             </div>
           </div>
         )}

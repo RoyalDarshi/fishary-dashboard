@@ -25,7 +25,7 @@ interface OpenLayersMapProps {
   getFullMetricName: () => string;
   officerNames: Record<string, string>;
   onAreaClick: (details: any | null) => void; // New prop for click handler
-  onDrillDown: (stateName: string) => void;
+  onDrillDown: (details: any | null) => void;
   mapView: "state" | "sub-district" | "district"; // Updated prop to control map view
   isDrilledDown: boolean;
 }
@@ -222,7 +222,7 @@ const lastClickedFeatureRef = useRef<any>(null);
     });
 
     // Add click functionality for area details popup - uses refs for dynamic data
-    newMap.on("click", (evt) => {
+    newMap.on("singleclick", (evt) => {
       const features = newMap.getFeaturesAtPixel(evt.pixel);
       let featureToClick = null;
 
@@ -288,13 +288,15 @@ const lastClickedFeatureRef = useRef<any>(null);
         } else {
           currentOnAreaClick(null); // Close the popup if a non-relevant feature is clicked
         }
-    }, 300); // 300ms delay to detect double-click
+    }, 0); // 300ms delay to detect double-click
   }
     });
 
     // Add double-click for drill-down
-    newMap.on("dblclick", (evt) => {
-  // Clear single-click timeout
+    // Add double-click for drill-down
+// Add double-click for drill-down
+newMap.on("dblclick", (evt) => {
+  // Clear single-click timeout so popup won't trigger
   if (clickTimeoutRef.current) {
     clearTimeout(clickTimeoutRef.current);
     clickTimeoutRef.current = null;
@@ -309,13 +311,30 @@ const lastClickedFeatureRef = useRef<any>(null);
 
   if (featureToDrill) {
     const properties = featureToDrill.getProperties();
+    const id = properties.shapeID;
+    const name = properties.shapeName || "Unknown Area";
     const level = properties.level;
-    if (level === "state") {
-      const stateName = properties.shapeName;
-      onDrillDownRef.current(stateName);
-    }
+
+    const currentMetricData = metricDataRef.current;
+    const currentDemographicKey = demographicKeyRef.current;
+    const currentOfficerNames = officerNamesRef.current;
+
+    const areaAllMetrics = currentMetricData?.[id]?.[currentDemographicKey];
+
+    const details = {
+      id,
+      name,
+      officer: currentOfficerNames[id] || "N/A",
+      metrics: areaAllMetrics,
+      level: level,
+      st_nm: properties.st_nm,
+      district_name: properties.district_name,
+    };
+
+    onDrillDownRef.current(details);
   }
 });
+
 
     setMap(newMap);
 
