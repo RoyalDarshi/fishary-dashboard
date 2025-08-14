@@ -972,7 +972,6 @@ const App: React.FC = () => {
 
   // Handle drill down
   const handleDrillDown = (areaDetails: any) => {
-    console.log("Drill down to area:", areaDetails);
   // setSelectedState(stateName);
     // setSelectedAreaDetails(null); // Ensure popup doesn't open
     if (!polygonData || !metricData) return;
