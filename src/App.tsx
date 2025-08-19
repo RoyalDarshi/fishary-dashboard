@@ -69,11 +69,12 @@ export interface PMMSYAggregatedData {
 // Display name mappings
 const schemeDisplayNames: Record<SchemeKey, string> = {
   all: "All Schemes",
-  PMMKSS: "PMMKSS",
-  PMMSY: "PMMSY",
-  KCC: "KCC",
-  NFDP: "NFDP",
+  PMMKSS: "Pradhan Mantri Matsya Kisaan Samridhi Sah-Yojana",
+  PMMSY: "Pradhan Mantri Matsya Sampada Yojana",
+  KCC: "Kisan Credit Card",
+  NFDP: "The National Fisheries Digital Platform",
 };
+
 
 const genderDisplayNames: Record<GenderKey, string> = {
   all: "All Genders",
@@ -81,6 +82,24 @@ const genderDisplayNames: Record<GenderKey, string> = {
   female: "Female",
   transgender: "Transgender",
 };
+
+const categoryColors: Record<SchemeKey, string> = {
+  PMMKSS: "#2563eb", // Blue
+  PMMSY: "#10b981",  // Green
+  KCC: "#f97316",    // Orange
+  NFDP: "#9333ea",   // Purple
+  all: "#6b7280",    // Default gray
+};
+
+const schemeIcons: Record<SchemeKey, JSX.Element> = {
+  PMMKSS: <Users className="w-6 h-6 text-white" />,
+  PMMSY: <Fish className="w-6 h-6 text-white" />,
+  KCC: <IndianRupee className="w-6 h-6 text-white" />,
+  NFDP: <TrendingUp className="w-6 h-6 text-white" />,
+  all: <MapPin className="w-6 h-6 text-white" />
+};
+
+
 
 const yearDisplayNames: Record<YearKey, string> = {
   all: "All Years",
@@ -1199,32 +1218,33 @@ const App: React.FC = () => {
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-        <div className="max-w-4xl w-full px-4">
-          <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">Select a Scheme</h1>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {schemes.map((scheme) => (
-              <div
-                key={scheme}
-                className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-6 cursor-pointer hover:shadow-xl transition-shadow"
-                onClick={() => setSelectedScheme(scheme)}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold text-gray-800">{schemeDisplayNames[scheme]}</h2>
-                    <p className="text-2xl font-bold text-blue-600 mt-2">
-                      ₹{formatNumber(schemeTotals[scheme])}
-                    </p>
-                    <p className="text-sm text-gray-600 mt-1">Total Funds Allocated</p>
-                  </div>
-                  <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl">
-                    <MapPin className="w-6 h-6 text-white" />
-                  </div>
-                </div>
-              </div>
-            ))}
+  <div className="max-w-4xl w-full px-4">
+    <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">Select a Scheme</h1>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {schemes.map((scheme) => (
+        <div
+          key={scheme}
+          className="backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-6 cursor-pointer hover:shadow-xl transition-transform hover:scale-105"
+          onClick={() => setSelectedScheme(scheme)}
+          style={{ backgroundColor: categoryColors[scheme] }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-white">{schemeDisplayNames[scheme]}</h2>
+              <p className="text-2xl font-bold text-white mt-2">
+                ₹{formatNumber(schemeTotals[scheme])}
+              </p>
+              <p className="text-sm text-white/80 mt-1">Total Funds Allocated</p>
+            </div>
+            <div className="p-3 bg-white/20 rounded-xl">
+              {schemeIcons[scheme]}
+            </div>
           </div>
         </div>
-      </div>
+      ))}
+    </div>
+  </div>
+</div>
     );
   };
 
