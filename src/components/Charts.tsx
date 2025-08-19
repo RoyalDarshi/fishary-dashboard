@@ -21,6 +21,7 @@ interface SectorDistributionPieChartProps {
 // Props interface for DistributionPieChart
 interface DistributionPieChartProps {
   pieData: Array<{ name: string; value: number; color: string }>;
+  selectedMetric: string;
 }
 
 // Props interface for TopAreasBarChart
@@ -47,6 +48,17 @@ interface EmploymentBarChartProps {
   };
   getColor: (metric: string, value: string) => string;
 }
+
+function getMetricDisplayName(metric: string): string {
+    return {
+      beneficiaries: "Beneficiaries",
+      funds: "Funds Allocated",
+      registrations: "Total Registrations",
+      totalProjects: "Total Projects",
+      totalInvestment: "Total Investment",
+      fishOutput: "Fish Output",
+    }[metric] || "Unknown Metric";
+  }
 
 // Sector Distribution Pie Chart for PMMSY
 export const SectorDistributionPieChart: React.FC<SectorDistributionPieChartProps> = ({
@@ -79,10 +91,10 @@ export const SectorDistributionPieChart: React.FC<SectorDistributionPieChartProp
 };
 
 // Distribution Pie Chart for non-PMMSY data
-export const DistributionPieChart: React.FC<DistributionPieChartProps> = ({ pieData }) => {
+export const DistributionPieChart: React.FC<DistributionPieChartProps> = ({ pieData,selectedMetric }) => {
   return (
     <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-4">
-      <h3 className="text-lg font-semibold text-gray-900 pl-4">Distribution Overview</h3>
+      <h3 className="text-lg font-semibold text-gray-900 pl-4">Distribution Overview by {getMetricDisplayName(selectedMetric)}</h3>
       <ResponsiveContainer width="100%" height={250}>
         <PieChart>
           <Pie
@@ -246,14 +258,4 @@ export const TopAreasBarChart: React.FC<TopAreasBarChartProps> = ({
     </div>
   );
 
-  function getMetricDisplayName(metric: string): string {
-    return {
-      beneficiaries: "Beneficiaries",
-      funds: "Funds Allocated",
-      registrations: "Total Registrations",
-      totalProjects: "Total Projects",
-      totalInvestment: "Total Investment",
-      fishOutput: "Fish Output",
-    }[metric] || "Unknown Metric";
-  }
 };

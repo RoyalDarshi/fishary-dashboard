@@ -95,8 +95,9 @@ const App: React.FC = () => {
   const [polygonData, setPolygonData] = useState<GeoJSONData | null>(null);
   const [metricData, setMetricData] = useState<Record<string, AreaMetricData> | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<"beneficiaries" | "funds" | "registrations" | PMMSYMetricKey>("beneficiaries");
-  const [selectedScheme, setSelectedScheme] = useState<SchemeKey>("all");
+  const [selectedScheme, setSelectedScheme] = useState<SchemeKey | null>(null);
   const [selectedGender, setSelectedGender] = useState<GenderKey>("all");
+  const [schemeTotals, setSchemeTotals] = useState<Record<SchemeKey, number> | null>(null);
   const [selectedYear, setSelectedYear] = useState<YearKey>("all");
   const [error, setError] = useState<string | null>(null);
   const [selectedAreaDetails, setSelectedAreaDetails] = useState<any | null>(null);
@@ -331,6 +332,36 @@ const App: React.FC = () => {
       timeout = setTimeout(() => func(...args), wait);
     };
   };
+
+  useEffect(() => {
+    if (!mockNonPMMSYData || !mockPMMSYData) return;
+
+    const totals: Record<SchemeKey, number> = {
+      all: 0,
+      PMMKSS: 0,
+      PMMSY: 0,
+      KCC: 0,
+      NFDP: 0,
+    };
+
+    // Calculate for non-PMMSY schemes
+    const nonPMMSYSchemes: SchemeKey[] = ['PMMKSS', 'KCC', 'NFDP'];
+    nonPMMSYSchemes.forEach(scheme => {
+      Object.values(mockNonPMMSYData).forEach(areaData => {
+        const key = `${scheme}_all_all`;
+        totals[scheme] += areaData[key]?.funds || 0;
+      });
+    });
+
+    // Calculate for PMMSY
+    Object.values(mockPMMSYData).forEach(areaData => {
+      const key = "PMMSY_all_all_all";
+      totals.PMMSY += areaData[key]?.totalInvestment || 0;
+    });
+
+    setSchemeTotals(totals);
+  }, [mockNonPMMSYData, mockPMMSYData]);
+
 
   const debouncedSetSelectedSectorPMMSY = useCallback(debounce(setSelectedSectorPMMSY, 0), []);
   const debouncedSetSelectedFinancialYearPMMSY = useCallback(debounce(setSelectedFinancialYearPMMSY, 0), []);
@@ -968,7 +999,7 @@ const App: React.FC = () => {
         averages,
       });
     }
-  };
+  };  
 
   // Handle drill down
   const handleDrillDown = (areaDetails: any) => {
@@ -1154,6 +1185,49 @@ const App: React.FC = () => {
     selectedMetric,
   ]);
 
+   // Scheme Selection View
+  const SchemeSelectionView = () => {
+    if (!schemeTotals) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div>Loading scheme data...</div>
+        </div>
+      );
+    }
+
+    const schemes: SchemeKey[] = ['PMMKSS', 'PMMSY', 'KCC', 'NFDP'];
+
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+        <div className="max-w-4xl w-full px-4">
+          <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">Select a Scheme</h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {schemes.map((scheme) => (
+              <div
+                key={scheme}
+                className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-6 cursor-pointer hover:shadow-xl transition-shadow"
+                onClick={() => setSelectedScheme(scheme)}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-800">{schemeDisplayNames[scheme]}</h2>
+                    <p className="text-2xl font-bold text-blue-600 mt-2">
+                      ₹{formatNumber(schemeTotals[scheme])}
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">Total Funds Allocated</p>
+                  </div>
+                  <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl">
+                    <MapPin className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Loading and error states
   if (error) {
     return (
@@ -1192,92 +1266,107 @@ const App: React.FC = () => {
               <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 Fisheries Dashboard
               </h1>
+              {selectedScheme && (
+                <button
+                  onClick={() => setSelectedScheme(null)}
+                  className="ml-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1 px-3 rounded-full text-sm"
+                >
+                  Back to Schemes
+                </button>
+              )}
             </div>
-            <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-x-2">
-              <label htmlFor="metric-select" className="font-semibold text-xs sm:text-sm">
-                Metric
-              </label>
-              <select
-                id="metric-select"
-                value={selectedMetric}
-                onChange={(e) =>
-                  setSelectedMetric(e.target.value as "beneficiaries" | "funds" | "registrations" | PMMSYMetricKey)
-                }
-                className="p-1 bg-gray-50 border border-gray-300 rounded-md text-xs sm:text-sm"
-              >
-                {selectedScheme === "PMMSY" ? (
-                  <>
-                    <option value="totalProjects">Total Projects</option>
-                    <option value="totalInvestment">Total Investment</option>
-                    <option value="fishOutput">Fish Output</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="beneficiaries">Beneficiaries</option>
-                    <option value="funds">Funds Allocated</option>
-                    <option value="registrations">Total Registrations</option>
-                  </>
-                )}
-              </select>
-            </div>
-            <div className="flex items-center gap-x-2">
-              <button
-                onClick={() => { setMapView("state"); setSelectedState(null); }}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                  mapView === "state"
-                    ? "bg-blue-600 text-white shadow-md"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                State View
-              </button>
-              <button
-                onClick={() => setMapView("district")}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                  mapView === "district"
-                    ? "bg-blue-600 text-white shadow-md"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                District View
-              </button>
-              <button
-                onClick={() => setMapView("sub-district")}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                  mapView === "sub-district"
-                    ? "bg-blue-600 text-white shadow-md"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                Sub-District View
-              </button>
-            </div>
+            {selectedScheme && (
+              <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-x-2">
+                <label htmlFor="metric-select" className="font-semibold text-xs sm:text-sm">
+                  Metric
+                </label>
+                <select
+                  id="metric-select"
+                  value={selectedMetric}
+                  onChange={(e) =>
+                    setSelectedMetric(e.target.value as "beneficiaries" | "funds" | "registrations" | PMMSYMetricKey)
+                  }
+                  className="p-1 bg-gray-50 border border-gray-300 rounded-md text-xs sm:text-sm"
+                >
+                  {selectedScheme === "PMMSY" ? (
+                    <>
+                      <option value="totalProjects">Total Projects</option>
+                      <option value="totalInvestment">Total Investment</option>
+                      <option value="fishOutput">Fish Output</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="beneficiaries">Beneficiaries</option>
+                      <option value="funds">Funds Allocated</option>
+                      <option value="registrations">Total Registrations</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            )}
+            {selectedScheme && (
+              <div className="flex items-center gap-x-2">
+                <button
+                  onClick={() => { setMapView("state"); setSelectedState(null); }}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    mapView === "state"
+                      ? "bg-blue-600 text-white shadow-md"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  State View
+                </button>
+                <button
+                  onClick={() => setMapView("district")}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    mapView === "district"
+                      ? "bg-blue-600 text-white shadow-md"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  District View
+                </button>
+                <button
+                  onClick={() => setMapView("sub-district")}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    mapView === "sub-district"
+                      ? "bg-blue-600 text-white shadow-md"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  Sub-District View
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       <main className="mx-auto px-2 py-2">
-        {/* Filters and KPIs */}
-        <FiltersAndKPIs
-          selectedMetric={selectedMetric}
-          setSelectedMetric={setSelectedMetric}
-          selectedScheme={selectedScheme}
-          setSelectedScheme={handleSelectedScheme}
-          selectedGender={selectedGender}
-          setSelectedGender={setSelectedGender}
-          selectedYear={selectedYear}
-          setSelectedYear={setSelectedYear}
-          selectedSectorPMMSY={selectedSectorPMMSY}
-          setSelectedSectorPMMSY={setSelectedSectorPMMSY}
-          selectedFinancialYearPMMSY={selectedFinancialYearPMMSY}
-          setSelectedFinancialYearPMMSY={setSelectedFinancialYearPMMSY}
-          pmmsySectors={pmmsySectors}
-          pmmsyFinancialYears={pmmsyFinancialYears}
-          globalPMMSYMetrics={globalPMMSYMetrics}
-          kpis={kpis}
-          formatMetricValue={formatMetricValue}
-          getMetricIcon={getMetricIcon}
-        />
+        {selectedScheme === null ? (
+          <SchemeSelectionView />
+        ) : (
+          <>
+            {/* Filters and KPIs */}
+            <FiltersAndKPIs
+              selectedMetric={selectedMetric}
+              setSelectedMetric={setSelectedMetric}
+              selectedScheme={selectedScheme}
+              selectedGender={selectedGender}
+              setSelectedGender={setSelectedGender}
+              selectedYear={selectedYear}
+              setSelectedYear={setSelectedYear}
+              selectedSectorPMMSY={selectedSectorPMMSY}
+              setSelectedSectorPMMSY={setSelectedSectorPMMSY}
+              selectedFinancialYearPMMSY={selectedFinancialYearPMMSY}
+              setSelectedFinancialYearPMMSY={setSelectedFinancialYearPMMSY}
+              pmmsySectors={pmmsySectors}
+              pmmsyFinancialYears={pmmsyFinancialYears}
+              globalPMMSYMetrics={globalPMMSYMetrics}
+              kpis={kpis}
+              formatMetricValue={formatMetricValue}
+              getMetricIcon={getMetricIcon}
+            />
 
         {/* Main Content */}
         <div className="grid grid-cols-5 gap-2">
@@ -1427,7 +1516,7 @@ const App: React.FC = () => {
               /></>
             ) : (
               <>
-                <DistributionPieChart pieData={pieData} />
+                <DistributionPieChart pieData={pieData} selectedMetric={selectedMetric} />
                 <TopAreasBarChart
                   barChartData={barChartData}
                   barChartKeys={barChartKeys}
@@ -1447,11 +1536,13 @@ const App: React.FC = () => {
 
         {/* Area Details Popup */}
         <AreaDetailsPopup
-          selectedAreaDetails={selectedAreaDetails}
-          selectedScheme={selectedScheme}
-          formatMetricValue={formatMetricValue}
-          setSelectedAreaDetails={setSelectedAreaDetails}
-        />
+              selectedAreaDetails={selectedAreaDetails}
+              selectedScheme={selectedScheme}
+              formatMetricValue={formatMetricValue}
+              setSelectedAreaDetails={setSelectedAreaDetails}
+            />
+          </>
+            )}
       </main>
 
       <footer className="bg-white/80 backdrop-blur-md border-t border-white/20 mt-2">

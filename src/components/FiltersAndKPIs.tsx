@@ -7,7 +7,6 @@ interface FiltersAndKPIsProps {
   selectedMetric: "beneficiaries" | "funds" | "registrations";
   setSelectedMetric: (value: "beneficiaries" | "funds" | "registrations") => void;
   selectedScheme: SchemeKey;
-  setSelectedScheme: (value: SchemeKey) => void;
   selectedGender: GenderKey;
   setSelectedGender: (value: GenderKey) => void;
   selectedYear: YearKey;
@@ -25,14 +24,6 @@ interface FiltersAndKPIsProps {
 }
 
 // Display names for filters
-const schemeDisplayNames: Record<SchemeKey, string> = {
-  all: "All Schemes",
-  PMMKSS: "Pradhan Mantri Matsya Kisaan Samridhi Sah-Yojana",
-  PMMSY: "Pradhan Mantri Matsya Sampada Yojana",
-  KCC: "Kishan Credit Card",
-  NFDP: "National Fisheries Digital Platform",
-};
-
 const genderDisplayNames: Record<GenderKey, string> = {
   all: "All Genders",
   male: "Male",
@@ -52,7 +43,6 @@ const FiltersAndKPIs: React.FC<FiltersAndKPIsProps> = ({
   selectedMetric,
   setSelectedMetric,
   selectedScheme,
-  setSelectedScheme,
   selectedGender,
   setSelectedGender,
   selectedYear,
@@ -72,25 +62,7 @@ const FiltersAndKPIs: React.FC<FiltersAndKPIsProps> = ({
     <>
       {/* Filters */}
       <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2 mb-2">
-        <div
-          className={`grid grid-cols-3 gap-4`}
-        >
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">
-              Scheme
-            </label>
-            <select
-              value={selectedScheme}
-              onChange={(e) => setSelectedScheme(e.target.value as SchemeKey)}
-              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-            >
-              {Object.entries(schemeDisplayNames).map(([key, display]) => (
-                <option key={key} value={key}>
-                  {display}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className={`grid ${selectedScheme === "PMMSY" ? "grid-cols-2" : "grid-cols-2"} gap-4`}>
           {selectedScheme === "PMMSY" ? (
             <>
               <div className="space-y-1">

@@ -292,8 +292,6 @@ const lastClickedFeatureRef = useRef<any>(null);
   }
     });
 
-    // Add double-click for drill-down
-    // Add double-click for drill-down
 // Add double-click for drill-down
 newMap.on("dblclick", (evt) => {
   // Clear single-click timeout so popup won't trigger
