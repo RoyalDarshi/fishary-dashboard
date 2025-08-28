@@ -75,7 +75,6 @@ const schemeDisplayNames: Record<SchemeKey, string> = {
   NFDP: "The National Fisheries Digital Platform",
 };
 
-
 const genderDisplayNames: Record<GenderKey, string> = {
   all: "All Genders",
   male: "Male",
@@ -85,10 +84,10 @@ const genderDisplayNames: Record<GenderKey, string> = {
 
 const categoryColors: Record<SchemeKey, string> = {
   PMMKSS: "#2563eb", // Blue
-  PMMSY: "#10b981",  // Green
-  KCC: "#f97316",    // Orange
-  NFDP: "#9333ea",   // Purple
-  all: "#6b7280",    // Default gray
+  PMMSY: "#10b981", // Green
+  KCC: "#f97316", // Orange
+  NFDP: "#9333ea", // Purple
+  all: "#6b7280", // Default gray
 };
 
 const schemeIcons: Record<SchemeKey, JSX.Element> = {
@@ -96,10 +95,8 @@ const schemeIcons: Record<SchemeKey, JSX.Element> = {
   PMMSY: <Fish className="w-6 h-6 text-white" />,
   KCC: <IndianRupee className="w-6 h-6 text-white" />,
   NFDP: <TrendingUp className="w-6 h-6 text-white" />,
-  all: <MapPin className="w-6 h-6 text-white" />
+  all: <MapPin className="w-6 h-6 text-white" />,
 };
-
-
 
 const yearDisplayNames: Record<YearKey, string> = {
   all: "All Years",
@@ -112,34 +109,58 @@ const yearDisplayNames: Record<YearKey, string> = {
 const App: React.FC = () => {
   // State variables
   const [polygonData, setPolygonData] = useState<GeoJSONData | null>(null);
-  const [metricData, setMetricData] = useState<Record<string, AreaMetricData> | null>(null);
-  const [selectedMetric, setSelectedMetric] = useState<"beneficiaries" | "funds" | "registrations" | PMMSYMetricKey>("beneficiaries");
+  const [metricData, setMetricData] = useState<Record<
+    string,
+    AreaMetricData
+  > | null>(null);
+  const [selectedMetric, setSelectedMetric] = useState<
+    "beneficiaries" | "funds" | "registrations" | PMMSYMetricKey
+  >("beneficiaries");
   const [selectedScheme, setSelectedScheme] = useState<SchemeKey | null>(null);
   const [selectedGender, setSelectedGender] = useState<GenderKey>("all");
-  const [schemeTotals, setSchemeTotals] = useState<Record<SchemeKey, number> | null>(null);
+  const [schemeTotals, setSchemeTotals] = useState<Record<
+    SchemeKey,
+    number
+  > | null>(null);
   const [selectedYear, setSelectedYear] = useState<YearKey>("all");
   const [error, setError] = useState<string | null>(null);
-  const [selectedAreaDetails, setSelectedAreaDetails] = useState<any | null>(null);
-  const [drilledAreaDetails, setDrilledAreaDetails] = useState<any | null>(null);
-  const [selectedBarChartCategory, setSelectedBarChartCategory] = useState<"scheme" | "gender" | "year">("scheme");
-  const [mapView, setMapView] = useState<"state" | "district" | "sub-district">("state");
+  const [selectedAreaDetails, setSelectedAreaDetails] = useState<any | null>(
+    null
+  );
+  const [drilledAreaDetails, setDrilledAreaDetails] = useState<any | null>(
+    null
+  );
+  const [selectedBarChartCategory, setSelectedBarChartCategory] = useState<
+    "scheme" | "gender" | "year"
+  >("scheme");
+  const [mapView, setMapView] = useState<"state" | "district" | "sub-district">(
+    "state"
+  );
   const [selectedState, setSelectedState] = useState<string | null>(null);
-  const [globalPMMSYMetrics, setGlobalPMMSYMetrics] = useState<PMMSYAggregatedData>({
-    totalProjects: 0,
-    totalInvestment: 0,
-    fishOutput: 0,
-    totalEmploymentGenerated: 0,
-    directEmploymentMen: 0,
-    directEmploymentWomen: 0,
-    indirectEmploymentMen: 0,
-    indirectEmploymentWomen: 0,
-    projectsByStateUT: [],
-    sectorDistribution: [],
-  });
+  const [globalPMMSYMetrics, setGlobalPMMSYMetrics] =
+    useState<PMMSYAggregatedData>({
+      totalProjects: 0,
+      totalInvestment: 0,
+      fishOutput: 0,
+      totalEmploymentGenerated: 0,
+      directEmploymentMen: 0,
+      directEmploymentWomen: 0,
+      indirectEmploymentMen: 0,
+      indirectEmploymentWomen: 0,
+      projectsByStateUT: [],
+      sectorDistribution: [],
+    });
   const [selectedSectorPMMSY, setSelectedSectorPMMSY] = useState<string>("all");
-  const [selectedFinancialYearPMMSY, setSelectedFinancialYearPMMSY] = useState<string>("all");
-  const [mockPMMSYData, setMockPMMSYData] = useState<Record<string, AreaMetricData> | null>(null);
-  const [mockNonPMMSYData, setMockNonPMMSYData] = useState<Record<string, AreaMetricData> | null>(null);
+  const [selectedFinancialYearPMMSY, setSelectedFinancialYearPMMSY] =
+    useState<string>("all");
+  const [mockPMMSYData, setMockPMMSYData] = useState<Record<
+    string,
+    AreaMetricData
+  > | null>(null);
+  const [mockNonPMMSYData, setMockNonPMMSYData] = useState<Record<
+    string,
+    AreaMetricData
+  > | null>(null);
 
   // Memoized officer names
   const officerNames = useMemo(() => {
@@ -165,7 +186,9 @@ const App: React.FC = () => {
   }, [polygonData]);
 
   // Generate mock data for schemes other than PMMSY
-  const generateMockData = (areas: GeoJSONFeature[]): Record<string, AreaMetricData> => {
+  const generateMockData = (
+    areas: GeoJSONFeature[]
+  ): Record<string, AreaMetricData> => {
     const dataMap: Record<string, AreaMetricData> = {};
     const schemes: SchemeKey[] = ["all", "PMMKSS", "KCC", "NFDP"];
     const genders: GenderKey[] = ["all", "male", "female", "transgender"];
@@ -195,7 +218,10 @@ const App: React.FC = () => {
     areas.forEach((area) => {
       const areaId = area.properties.shapeID;
       const areaData: AreaMetricData = {};
-      const regionalBias = area.properties.level === "state" ? 1.0 + Math.random() * 0.1 : 0.9 + Math.random() * 0.2;
+      const regionalBias =
+        area.properties.level === "state"
+          ? 1.0 + Math.random() * 0.1
+          : 0.9 + Math.random() * 0.2;
 
       schemes.forEach((scheme) => {
         genders.forEach((gender) => {
@@ -206,13 +232,23 @@ const App: React.FC = () => {
             const yearMod = yearModifiers[year];
             const weight = schemeMod * genderMod * yearMod * regionalBias;
 
-            const beneficiaries = Math.floor(weight * (500 + Math.random() * 4500));
-            const funds = Math.floor(weight * (1000000 + Math.random() * 9000000));
-            const registrations = Math.floor(weight * (2000 + Math.random() * 8000));
+            const beneficiaries = Math.floor(
+              weight * (500 + Math.random() * 4500)
+            );
+            const funds = Math.floor(
+              weight * (1000000 + Math.random() * 9000000)
+            );
+            const registrations = Math.floor(
+              weight * (2000 + Math.random() * 8000)
+            );
 
             const funds_used = Math.floor(funds * (0.6 + Math.random() * 0.35));
-            const beneficiaries_last_24h = Math.floor(beneficiaries * (0.01 + Math.random() * 0.05));
-            const registrations_last_24h = Math.floor(registrations * (0.005 + Math.random() * 0.02));
+            const beneficiaries_last_24h = Math.floor(
+              beneficiaries * (0.01 + Math.random() * 0.05)
+            );
+            const registrations_last_24h = Math.floor(
+              registrations * (0.005 + Math.random() * 0.02)
+            );
 
             areaData[key] = {
               beneficiaries,
@@ -231,79 +267,111 @@ const App: React.FC = () => {
   };
 
   // Generate mock PMMSY data, aligned with other schemes
-  const generateMockPMMSYData = useCallback((areas: GeoJSONFeature[]): Record<string, AreaMetricData> => {
-  const dataMap: Record<string, AreaMetricData> = {};
-  const genders: GenderKey[] = ["male", "female", "transgender"];
-  const years: YearKey[] = ["2021", "2022", "2023", "2024"];
-  const sectors = ["Inland", "Marine"];
+  const generateMockPMMSYData = useCallback(
+    (areas: GeoJSONFeature[]): Record<string, AreaMetricData> => {
+      const dataMap: Record<string, AreaMetricData> = {};
+      const genders: GenderKey[] = ["male", "female", "transgender"];
+      const years: YearKey[] = ["2021", "2022", "2023", "2024"];
+      const sectors = ["Inland", "Marine"];
 
-  areas.forEach((area) => {
-    const areaId = area.properties.shapeID;
-    const areaData: AreaMetricData = {};
-    const regionalBias = 0.1 + Math.random() * 1.9;
+      areas.forEach((area) => {
+        const areaId = area.properties.shapeID;
+        const areaData: AreaMetricData = {};
+        const regionalBias = 0.1 + Math.random() * 1.9;
 
-    // Precompute aggregated data for common filter combinations
-    const aggregated: Record<string, MetricValues> = {
-      "PMMSY_all_all_all": { totalProjects: 0, totalInvestment: 0, fishOutput: 0 },
-    };
+        // Precompute aggregated data for common filter combinations
+        const aggregated: Record<string, MetricValues> = {
+          PMMSY_all_all_all: {
+            totalProjects: 0,
+            totalInvestment: 0,
+            fishOutput: 0,
+          },
+        };
 
-    genders.forEach((gender) => {
-      years.forEach((year) => {
-        sectors.forEach((sector) => {
-          const key = `PMMSY_${gender}_${year}_${sector}`;
-          const genderMod = gender === "male" ? 1.2 : gender === "female" ? 0.9 : 0.8;
-          const yearMod = year === "2021" ? 0.8 : year === "2022" ? 0.9 : year === "2023" ? 1.0 : 1.1;
-          const sectorMod = sector === "Inland" ? 1.1 : 0.9;
-          const weight = genderMod * yearMod * sectorMod * regionalBias;
+        genders.forEach((gender) => {
+          years.forEach((year) => {
+            sectors.forEach((sector) => {
+              const key = `PMMSY_${gender}_${year}_${sector}`;
+              const genderMod =
+                gender === "male" ? 1.2 : gender === "female" ? 0.9 : 0.8;
+              const yearMod =
+                year === "2021"
+                  ? 0.8
+                  : year === "2022"
+                  ? 0.9
+                  : year === "2023"
+                  ? 1.0
+                  : 1.1;
+              const sectorMod = sector === "Inland" ? 1.1 : 0.9;
+              const weight = genderMod * yearMod * sectorMod * regionalBias;
 
-          const totalProjects = Math.floor(weight * (3 + Math.random() * 1));
-          const totalInvestment = Math.floor(weight * (50000 + Math.random() * 450000));
-          const fishOutput = Math.floor(weight * (5 + Math.random() * 1));
+              const totalProjects = Math.floor(
+                weight * (3 + Math.random() * 1)
+              );
+              const totalInvestment = Math.floor(
+                weight * (50000 + Math.random() * 450000)
+              );
+              const fishOutput = Math.floor(weight * (5 + Math.random() * 1));
 
-          areaData[key] = {
-            totalProjects,
-            totalInvestment,
-            fishOutput,
-          };
+              areaData[key] = {
+                totalProjects,
+                totalInvestment,
+                fishOutput,
+              };
 
-          // Update aggregated data
-          aggregated["PMMSY_all_all_all"].totalProjects! += totalProjects;
-          aggregated["PMMSY_all_all_all"].totalInvestment! += totalInvestment;
-          aggregated["PMMSY_all_all_all"].fishOutput! += fishOutput;
+              // Update aggregated data
+              aggregated["PMMSY_all_all_all"].totalProjects! += totalProjects;
+              aggregated["PMMSY_all_all_all"].totalInvestment! +=
+                totalInvestment;
+              aggregated["PMMSY_all_all_all"].fishOutput! += fishOutput;
 
-          // Add aggregations for specific filters
-          const genderKey = `PMMSY_${gender}_all_all`;
-          const yearKey = `PMMSY_all_${year}_all`;
-          const sectorKey = `PMMSY_all_all_${sector}`;
-          if (!aggregated[genderKey]) {
-            aggregated[genderKey] = { totalProjects: 0, totalInvestment: 0, fishOutput: 0 };
-          }
-          if (!aggregated[yearKey]) {
-            aggregated[yearKey] = { totalProjects: 0, totalInvestment: 0, fishOutput: 0 };
-          }
-          if (!aggregated[sectorKey]) {
-            aggregated[sectorKey] = { totalProjects: 0, totalInvestment: 0, fishOutput: 0 };
-          }
-          aggregated[genderKey].totalProjects! += totalProjects;
-          aggregated[genderKey].totalInvestment! += totalInvestment;
-          aggregated[genderKey].fishOutput! += fishOutput;
-          aggregated[yearKey].totalProjects! += totalProjects;
-          aggregated[yearKey].totalInvestment! += totalInvestment;
-          aggregated[yearKey].fishOutput! += fishOutput;
-          aggregated[sectorKey].totalProjects! += totalProjects;
-          aggregated[sectorKey].totalInvestment! += totalInvestment;
-          aggregated[sectorKey].fishOutput! += fishOutput;
+              // Add aggregations for specific filters
+              const genderKey = `PMMSY_${gender}_all_all`;
+              const yearKey = `PMMSY_all_${year}_all`;
+              const sectorKey = `PMMSY_all_all_${sector}`;
+              if (!aggregated[genderKey]) {
+                aggregated[genderKey] = {
+                  totalProjects: 0,
+                  totalInvestment: 0,
+                  fishOutput: 0,
+                };
+              }
+              if (!aggregated[yearKey]) {
+                aggregated[yearKey] = {
+                  totalProjects: 0,
+                  totalInvestment: 0,
+                  fishOutput: 0,
+                };
+              }
+              if (!aggregated[sectorKey]) {
+                aggregated[sectorKey] = {
+                  totalProjects: 0,
+                  totalInvestment: 0,
+                  fishOutput: 0,
+                };
+              }
+              aggregated[genderKey].totalProjects! += totalProjects;
+              aggregated[genderKey].totalInvestment! += totalInvestment;
+              aggregated[genderKey].fishOutput! += fishOutput;
+              aggregated[yearKey].totalProjects! += totalProjects;
+              aggregated[yearKey].totalInvestment! += totalInvestment;
+              aggregated[yearKey].fishOutput! += fishOutput;
+              aggregated[sectorKey].totalProjects! += totalProjects;
+              aggregated[sectorKey].totalInvestment! += totalInvestment;
+              aggregated[sectorKey].fishOutput! += fishOutput;
+            });
+          });
         });
+
+        // Store aggregated data
+        Object.assign(areaData, aggregated);
+        dataMap[areaId] = areaData;
       });
-    });
 
-    // Store aggregated data
-    Object.assign(areaData, aggregated);
-    dataMap[areaId] = areaData;
-  });
-
-  return dataMap;
-}, []);
+      return dataMap;
+    },
+    []
+  );
 
   // Generate mock data for all schemes
   useEffect(() => {
@@ -317,31 +385,31 @@ const App: React.FC = () => {
 
   // Combine metric data based on scheme
   const combinedMetricData = useMemo(() => {
-  if (!mockNonPMMSYData || !mockPMMSYData) return null;
+    if (!mockNonPMMSYData || !mockPMMSYData) return null;
 
-  if (selectedScheme === "PMMSY") {
-    const filterKey = `PMMSY_${selectedGender}_${selectedFinancialYearPMMSY}_${selectedSectorPMMSY}`;
-    const filteredData: Record<string, AreaMetricData> = {};
-    Object.entries(mockPMMSYData).forEach(([areaId, areaData]) => {
-      // Use precomputed aggregated data if available
-      const metrics = areaData[filterKey] || {
-        totalProjects: 0,
-        totalInvestment: 0,
-        fishOutput: 0,
-      };
-      filteredData[areaId] = { "PMMSY_aggregated": metrics };
-    });
-    return filteredData;
-  }
-  return mockNonPMMSYData;
-}, [
-  mockNonPMMSYData,
-  mockPMMSYData,
-  selectedScheme,
-  selectedGender,
-  selectedSectorPMMSY,
-  selectedFinancialYearPMMSY,
-]);
+    if (selectedScheme === "PMMSY") {
+      const filterKey = `PMMSY_${selectedGender}_${selectedFinancialYearPMMSY}_${selectedSectorPMMSY}`;
+      const filteredData: Record<string, AreaMetricData> = {};
+      Object.entries(mockPMMSYData).forEach(([areaId, areaData]) => {
+        // Use precomputed aggregated data if available
+        const metrics = areaData[filterKey] || {
+          totalProjects: 0,
+          totalInvestment: 0,
+          fishOutput: 0,
+        };
+        filteredData[areaId] = { PMMSY_aggregated: metrics };
+      });
+      return filteredData;
+    }
+    return mockNonPMMSYData;
+  }, [
+    mockNonPMMSYData,
+    mockPMMSYData,
+    selectedScheme,
+    selectedGender,
+    selectedSectorPMMSY,
+    selectedFinancialYearPMMSY,
+  ]);
 
   // Debounced state updates for PMMSY filters
   const debounce = (func: (...args: any[]) => void, wait: number) => {
@@ -364,16 +432,17 @@ const App: React.FC = () => {
     };
 
     // Calculate for non-PMMSY schemes
-    const nonPMMSYSchemes: SchemeKey[] = ['PMMKSS', 'KCC', 'NFDP'];
-    nonPMMSYSchemes.forEach(scheme => {
-      Object.values(mockNonPMMSYData).forEach(areaData => {
+    const nonPMMSYSchemes: SchemeKey[] = ["PMMKSS", "KCC", "NFDP"];
+    nonPMMSYSchemes.forEach((scheme) => {
+      Object.values(mockNonPMMSYData).forEach((areaData) => {
         const key = `${scheme}_all_all`;
         totals[scheme] += areaData[key]?.funds || 0;
       });
     });
 
     // Calculate for PMMSY
-    Object.values(mockPMMSYData).forEach(areaData => {
+    Object.values(mockPMMSYData).forEach((areaData) => {
+      console.log(areaData);
       const key = "PMMSY_all_all_all";
       totals.PMMSY += areaData[key]?.totalInvestment || 0;
     });
@@ -381,13 +450,21 @@ const App: React.FC = () => {
     setSchemeTotals(totals);
   }, [mockNonPMMSYData, mockPMMSYData]);
 
-
-  const debouncedSetSelectedSectorPMMSY = useCallback(debounce(setSelectedSectorPMMSY, 0), []);
-  const debouncedSetSelectedFinancialYearPMMSY = useCallback(debounce(setSelectedFinancialYearPMMSY, 0), []);
+  const debouncedSetSelectedSectorPMMSY = useCallback(
+    debounce(setSelectedSectorPMMSY, 0),
+    []
+  );
+  const debouncedSetSelectedFinancialYearPMMSY = useCallback(
+    debounce(setSelectedFinancialYearPMMSY, 0),
+    []
+  );
 
   // PMMSY filter options
   const pmmsySectors = useMemo(() => ["all", "Inland", "Marine"], []);
-  const pmmsyFinancialYears = useMemo(() => ["all", "2021", "2022", "2023", "2024"], []);
+  const pmmsyFinancialYears = useMemo(
+    () => ["all", "2021", "2022", "2023", "2024"],
+    []
+  );
 
   // Fetch GeoJSON and set metric data
   useEffect(() => {
@@ -427,14 +504,26 @@ const App: React.FC = () => {
   const filteredGeoJsonData = useMemo(() => {
     if (!polygonData) return null;
 
-    let stateFeaturesToShow = polygonData.features.filter((f) => f.properties.level === "state");
-    let districtFeaturesToShow = polygonData.features.filter((f) => f.properties.level === "district");
-    let subDistrictFeaturesToShow = polygonData.features.filter((f) => f.properties.level === "sub-district");
+    let stateFeaturesToShow = polygonData.features.filter(
+      (f) => f.properties.level === "state"
+    );
+    let districtFeaturesToShow = polygonData.features.filter(
+      (f) => f.properties.level === "district"
+    );
+    let subDistrictFeaturesToShow = polygonData.features.filter(
+      (f) => f.properties.level === "sub-district"
+    );
 
     if (selectedState) {
-      stateFeaturesToShow = stateFeaturesToShow.filter((f) => f.properties.shapeName === selectedState);
-      districtFeaturesToShow = districtFeaturesToShow.filter((f) => f.properties.st_nm === selectedState);
-      subDistrictFeaturesToShow = subDistrictFeaturesToShow.filter((f) => f.properties.st_nm === selectedState);
+      stateFeaturesToShow = stateFeaturesToShow.filter(
+        (f) => f.properties.shapeName === selectedState
+      );
+      districtFeaturesToShow = districtFeaturesToShow.filter(
+        (f) => f.properties.st_nm === selectedState
+      );
+      subDistrictFeaturesToShow = subDistrictFeaturesToShow.filter(
+        (f) => f.properties.st_nm === selectedState
+      );
     }
 
     if (mapView === "state") {
@@ -447,7 +536,11 @@ const App: React.FC = () => {
     } else {
       return {
         ...polygonData,
-        features: [...subDistrictFeaturesToShow, ...districtFeaturesToShow, ...stateFeaturesToShow],
+        features: [
+          ...subDistrictFeaturesToShow,
+          ...districtFeaturesToShow,
+          ...stateFeaturesToShow,
+        ],
       };
     }
   }, [polygonData, mapView, selectedState]);
@@ -491,9 +584,13 @@ const App: React.FC = () => {
 
       Object.entries(areaData).forEach(([key, metrics]) => {
         const [, gender, year, sector] = key.split("_");
-        const genderMatch = selectedGender === "all" || gender === selectedGender;
-        const yearMatch = selectedFinancialYearPMMSY === "all" || year === selectedFinancialYearPMMSY;
-        const sectorMatch = selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY;
+        const genderMatch =
+          selectedGender === "all" || gender === selectedGender;
+        const yearMatch =
+          selectedFinancialYearPMMSY === "all" ||
+          year === selectedFinancialYearPMMSY;
+        const sectorMatch =
+          selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY;
 
         if (genderMatch && yearMatch && sectorMatch) {
           globalMetrics.totalProjects += metrics.totalProjects || 0;
@@ -501,27 +598,46 @@ const App: React.FC = () => {
           globalMetrics.fishOutput += metrics.fishOutput || 0;
 
           const metricValue = metrics[selectedMetric] || 0;
-          projectsByAreaMap.set(areaName, (projectsByAreaMap.get(areaName) || 0) + metricValue);
+          projectsByAreaMap.set(
+            areaName,
+            (projectsByAreaMap.get(areaName) || 0) + metricValue
+          );
 
           if (sector !== "all") {
-            sectorDistributionMap.set(sector, (sectorDistributionMap.get(sector) || 0) + (metrics.totalProjects || 0));
+            sectorDistributionMap.set(
+              sector,
+              (sectorDistributionMap.get(sector) || 0) +
+                (metrics.totalProjects || 0)
+            );
           }
         }
       });
     });
 
-    globalMetrics.totalEmploymentGenerated = Math.floor(globalMetrics.totalProjects * (5 + Math.random() * 10));
-    globalMetrics.directEmploymentMen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.4);
-    globalMetrics.directEmploymentWomen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.3);
-    globalMetrics.indirectEmploymentMen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.2);
-    globalMetrics.indirectEmploymentWomen = Math.floor(globalMetrics.totalEmploymentGenerated * 0.1);
+    globalMetrics.totalEmploymentGenerated = Math.floor(
+      globalMetrics.totalProjects * (5 + Math.random() * 10)
+    );
+    globalMetrics.directEmploymentMen = Math.floor(
+      globalMetrics.totalEmploymentGenerated * 0.4
+    );
+    globalMetrics.directEmploymentWomen = Math.floor(
+      globalMetrics.totalEmploymentGenerated * 0.3
+    );
+    globalMetrics.indirectEmploymentMen = Math.floor(
+      globalMetrics.totalEmploymentGenerated * 0.2
+    );
+    globalMetrics.indirectEmploymentWomen = Math.floor(
+      globalMetrics.totalEmploymentGenerated * 0.1
+    );
 
     globalMetrics.projectsByStateUT = Array.from(projectsByAreaMap.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
 
-    globalMetrics.sectorDistribution = Array.from(sectorDistributionMap.entries()).map(([name, value]) => ({
+    globalMetrics.sectorDistribution = Array.from(
+      sectorDistributionMap.entries()
+    ).map(([name, value]) => ({
       name,
       value,
     }));
@@ -542,7 +658,13 @@ const App: React.FC = () => {
     if (selectedScheme === "PMMSY") {
       aggregatePMMSYChartData();
     }
-  }, [selectedScheme, selectedGender, selectedSectorPMMSY, selectedFinancialYearPMMSY, aggregatePMMSYChartData]);
+  }, [
+    selectedScheme,
+    selectedGender,
+    selectedSectorPMMSY,
+    selectedFinancialYearPMMSY,
+    aggregatePMMSYChartData,
+  ]);
 
   // Memoized demographic key
   const demographicKey = useMemo(() => {
@@ -585,7 +707,13 @@ const App: React.FC = () => {
     const min = Math.min(...values);
     const max = Math.max(...values);
     return { average, min, max };
-  }, [metricData, selectedMetric, demographicKey, filteredGeoJsonData, mapView]);
+  }, [
+    metricData,
+    selectedMetric,
+    demographicKey,
+    filteredGeoJsonData,
+    mapView,
+  ]);
 
   // Color function for all metrics
   const getColor = (metric: string, value: number | string): string => {
@@ -605,7 +733,8 @@ const App: React.FC = () => {
       Marine: "#6366f1",
     };
 
-    if (typeof value === "string" && categoryColors[value]) return categoryColors[value];
+    if (typeof value === "string" && categoryColors[value])
+      return categoryColors[value];
 
     if (metric === "beneficiaries") {
       if (typeof value === "number" && value >= 4000) return "#6366f1";
@@ -643,13 +772,27 @@ const App: React.FC = () => {
 
   // Format metric value
   const formatMetricValue = (metric: string, value: number): string => {
-    if (metric === "beneficiaries_last_24h" || metric === "registrations_last_24h" || metric === "totalProjects") {
+    if (
+      metric === "beneficiaries_last_24h" ||
+      metric === "registrations_last_24h" ||
+      metric === "totalProjects"
+    ) {
       return value.toLocaleString();
     }
-    if (metric === "funds" || metric === "funds_used" || metric === "totalInvestment") {
+    if (
+      metric === "funds" ||
+      metric === "funds_used" ||
+      metric === "totalInvestment"
+    ) {
+      if (mapView === "district" && selectedScheme === "PMMSY")
+        return `₹${formatNumber(value/20)}`;
+      else if (mapView === "sub-district" && selectedScheme === "PMMSY")
+        return `₹${formatNumber(value/200)}`;
       return `₹${formatNumber(value)}`;
     }
     if (metric === "fishOutput") {
+      if (mapView === "district") return `${(value / 20).toFixed(2)} Tonnes`;
+      if (mapView === "sub-district") return `${(value / 200).toFixed(2)} Tonnes`;
       return `${value.toFixed(2)} Tonnes`;
     }
     return formatNumber(value);
@@ -657,14 +800,16 @@ const App: React.FC = () => {
 
   // Metric display name
   const getMetricDisplayName = (metric: string): string => {
-    return {
-      beneficiaries: "Beneficiaries",
-      funds: "Funds Allocated",
-      registrations: "Total Registrations",
-      totalProjects: "Total Projects",
-      totalInvestment: "Total Investment",
-      fishOutput: "Fish Output",
-    }[metric] || "Unknown Metric";
+    return (
+      {
+        beneficiaries: "Beneficiaries",
+        funds: "Funds Allocated",
+        registrations: "Total Registrations",
+        totalProjects: "Total Projects",
+        totalInvestment: "Total Investment",
+        fishOutput: "Fish Output",
+      }[metric] || "Unknown Metric"
+    );
   };
 
   // Metric icon
@@ -673,7 +818,8 @@ const App: React.FC = () => {
     if (metric === "funds") return <IndianRupee className="w-5 h-5" />;
     if (metric === "registrations") return <TrendingUp className="w-5 h-5" />;
     if (metric === "totalProjects") return <TrendingUp className="w-5 h-5" />;
-    if (metric === "totalInvestment") return <IndianRupee className="w-5 h-5" />;
+    if (metric === "totalInvestment")
+      return <IndianRupee className="w-5 h-5" />;
     if (metric === "fishOutput") return <Fish className="w-5 h-5" />;
     return <TrendingUp className="w-5 h-5" />;
   };
@@ -725,9 +871,14 @@ const App: React.FC = () => {
 
   // Pie chart data (distribution by metric range)
   const pieData = useMemo(() => {
-    if (!metricData || !filteredGeoJsonData || !brackets[selectedMetric]) return [];
+    if (!metricData || !filteredGeoJsonData || !brackets[selectedMetric])
+      return [];
     const currentBrackets = brackets[selectedMetric];
-    const counts = currentBrackets.map(() => ({ count: 0, label: "", color: "" }));
+    const counts = currentBrackets.map(() => ({
+      count: 0,
+      label: "",
+      color: "",
+    }));
     currentBrackets.forEach((bracket, index) => {
       counts[index].label = bracket.label;
       counts[index].color = bracket.color;
@@ -743,7 +894,9 @@ const App: React.FC = () => {
         const id = feature.properties.shapeID;
         const value = metricData[id]?.[demographicKey]?.[selectedMetric];
         if (value !== undefined) {
-          const bracket = currentBrackets.find((b) => value >= b.min && (b.max === Infinity ? true : value < b.max));
+          const bracket = currentBrackets.find(
+            (b) => value >= b.min && (b.max === Infinity ? true : value < b.max)
+          );
           if (bracket) counts[currentBrackets.indexOf(bracket)].count++;
         }
       });
@@ -753,11 +906,18 @@ const App: React.FC = () => {
       value: c.count,
       color: c.color,
     }));
-  }, [metricData, filteredGeoJsonData, selectedMetric, demographicKey, mapView]);
+  }, [
+    metricData,
+    filteredGeoJsonData,
+    selectedMetric,
+    demographicKey,
+    mapView,
+  ]);
 
   // Bar chart data for PMMSY
   const pmmsyBarData = useMemo(() => {
-    if (!mockPMMSYData || !filteredGeoJsonData) return { data: [], keys: [], displayNamesMap: {} };
+    if (!mockPMMSYData || !filteredGeoJsonData)
+      return { data: [], keys: [], displayNamesMap: {} };
 
     const featuresForBarChart = filteredGeoJsonData.features.filter(
       (f) => f.properties.level === mapView
@@ -771,9 +931,13 @@ const App: React.FC = () => {
       let totalValue = 0;
       Object.entries(areaData).forEach(([key, metrics]) => {
         const [, gender, year, sector] = key.split("_");
-        const genderMatch = selectedGender === "all" || gender === selectedGender;
-        const yearMatch = selectedFinancialYearPMMSY === "all" || year === selectedFinancialYearPMMSY;
-        const sectorMatch = selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY;
+        const genderMatch =
+          selectedGender === "all" || gender === selectedGender;
+        const yearMatch =
+          selectedFinancialYearPMMSY === "all" ||
+          year === selectedFinancialYearPMMSY;
+        const sectorMatch =
+          selectedSectorPMMSY === "all" || sector === selectedSectorPMMSY;
         if (genderMatch && yearMatch && sectorMatch) {
           totalValue += metrics[selectedMetric] || 0;
         }
@@ -785,7 +949,8 @@ const App: React.FC = () => {
       .map((feature) => ({
         id: feature.properties.shapeID,
         name: feature.properties.shapeName || "Unknown Area",
-        overallValue: overallMetricDataForSorting[feature.properties.shapeID] || 0,
+        overallValue:
+          overallMetricDataForSorting[feature.properties.shapeID] || 0,
       }))
       .sort((a, b) => b.overallValue - a.overallValue)
       .slice(0, 10);
@@ -798,9 +963,11 @@ const App: React.FC = () => {
       case "gender":
         keys = ["male", "female", "transgender"];
         getDemographicKey = (areaId, key) =>
-          `PMMSY_${key}_${selectedFinancialYearPMMSY === "all" ? "2024" : selectedFinancialYearPMMSY}_${
-            selectedSectorPMMSY === "all" ? "Inland" : selectedSectorPMMSY
-          }`;
+          `PMMSY_${key}_${
+            selectedFinancialYearPMMSY === "all"
+              ? "2024"
+              : selectedFinancialYearPMMSY
+          }_${selectedSectorPMMSY === "all" ? "Inland" : selectedSectorPMMSY}`;
         displayNamesMap = genderDisplayNames;
         break;
       case "year":
@@ -815,7 +982,9 @@ const App: React.FC = () => {
         keys = ["Inland", "Marine"];
         getDemographicKey = (areaId, key) =>
           `PMMSY_${selectedGender === "all" ? "male" : selectedGender}_${
-            selectedFinancialYearPMMSY === "all" ? "2024" : selectedFinancialYearPMMSY
+            selectedFinancialYearPMMSY === "all"
+              ? "2024"
+              : selectedFinancialYearPMMSY
           }_${key}`;
         displayNamesMap = { Inland: "Inland", Marine: "Marine" };
         break;
@@ -848,16 +1017,21 @@ const App: React.FC = () => {
   // Bar chart data for non-PMMSY
   const overallMetricDataForSorting = useMemo(() => {
     if (!metricData || !filteredGeoJsonData) return {};
-    const overallKey = selectedScheme === "PMMSY" ? "PMMSY_aggregated" : `all_all_all`;
+    const overallKey =
+      selectedScheme === "PMMSY" ? "PMMSY_aggregated" : `all_all_all`;
     const data: Record<string, number> = {};
     filteredGeoJsonData.features.forEach((feature) => {
-      data[feature.properties.shapeID] = metricData[feature.properties.shapeID]?.[overallKey]?.[selectedMetric] ?? 0;
+      data[feature.properties.shapeID] =
+        metricData[feature.properties.shapeID]?.[overallKey]?.[
+          selectedMetric
+        ] ?? 0;
     });
     return data;
   }, [metricData, filteredGeoJsonData, selectedMetric, selectedScheme]);
 
   const barData = useMemo(() => {
-    if (!metricData || !filteredGeoJsonData) return { data: [], keys: [], displayNamesMap: {} };
+    if (!metricData || !filteredGeoJsonData)
+      return { data: [], keys: [], displayNamesMap: {} };
 
     const featuresForBarChart = filteredGeoJsonData.features.filter(
       (f) => f.properties.level === mapView
@@ -867,7 +1041,8 @@ const App: React.FC = () => {
       .map((feature) => ({
         id: feature.properties.shapeID,
         name: feature.properties.shapeName || "Unknown Area",
-        overallValue: overallMetricDataForSorting[feature.properties.shapeID] || 0,
+        overallValue:
+          overallMetricDataForSorting[feature.properties.shapeID] || 0,
       }))
       .sort((a, b) => b.overallValue - a.overallValue)
       .slice(0, 10);
@@ -879,17 +1054,20 @@ const App: React.FC = () => {
     switch (selectedBarChartCategory) {
       case "scheme":
         keys = ["PMMKSS", "KCC", "NFDP"]; // Removed PMMSY to fix bug
-        getDemographicKey = (areaId, key) => `${key}_${selectedGender}_${selectedYear}`;
+        getDemographicKey = (areaId, key) =>
+          `${key}_${selectedGender}_${selectedYear}`;
         displayNamesMap = schemeDisplayNames;
         break;
       case "gender":
         keys = ["male", "female", "transgender"];
-        getDemographicKey = (areaId, key) => `${selectedScheme}_${key}_${selectedYear}`;
+        getDemographicKey = (areaId, key) =>
+          `${selectedScheme}_${key}_${selectedYear}`;
         displayNamesMap = genderDisplayNames;
         break;
       case "year":
         keys = ["2021", "2022", "2023", "2024"];
-        getDemographicKey = (areaId, key) => `${selectedScheme}_${selectedGender}_${key}`;
+        getDemographicKey = (areaId, key) =>
+          `${selectedScheme}_${selectedGender}_${key}`;
         displayNamesMap = yearDisplayNames;
         break;
       default:
@@ -919,12 +1097,16 @@ const App: React.FC = () => {
     mapView,
   ]);
 
-  const { data: barChartData, keys: barChartKeys, displayNamesMap: barChartDisplayNamesMap } = barData;
+  const {
+    data: barChartData,
+    keys: barChartKeys,
+    displayNamesMap: barChartDisplayNamesMap,
+  } = barData;
 
   const handleSelectedScheme = (scheme: SchemeKey) => {
     setSelectedScheme(scheme);
     setSelectedState(null);
-  }
+  };
 
   // Handle area click
   const handleAreaClick = (areaDetails: any) => {
@@ -933,11 +1115,21 @@ const App: React.FC = () => {
     // Determine the group for averaging based on area type
     const getAverageGroup = (level: string, properties: any) => {
       if (level === "state") {
-        return polygonData.features.filter(f => f.properties.level === "state");
+        return polygonData.features.filter(
+          (f) => f.properties.level === "state"
+        );
       } else if (level === "district") {
-        return polygonData.features.filter(f => f.properties.level === "district" && f.properties.st_nm === properties.st_nm);
+        return polygonData.features.filter(
+          (f) =>
+            f.properties.level === "district" &&
+            f.properties.st_nm === properties.st_nm
+        );
       } else if (level === "sub-district") {
-        return polygonData.features.filter(f => f.properties.level === "sub-district" && f.properties.district_name === properties.district_name);
+        return polygonData.features.filter(
+          (f) =>
+            f.properties.level === "sub-district" &&
+            f.properties.district_name === properties.district_name
+        );
       }
       return [];
     };
@@ -946,17 +1138,18 @@ const App: React.FC = () => {
     const metricSums: { [key: string]: number } = {};
     const count = group.length;
 
-    group.forEach(feature => {
-      const areaMetrics = metricData[feature.properties.shapeID]?.[demographicKey];
+    group.forEach((feature) => {
+      const areaMetrics =
+        metricData[feature.properties.shapeID]?.[demographicKey];
       if (areaMetrics) {
-        Object.keys(areaMetrics).forEach(key => {
+        Object.keys(areaMetrics).forEach((key) => {
           metricSums[key] = (metricSums[key] || 0) + (areaMetrics[key] || 0);
         });
       }
     });
 
     const averages: { [key: string]: number } = {};
-    Object.keys(metricSums).forEach(key => {
+    Object.keys(metricSums).forEach((key) => {
       averages[key] = count > 0 ? metricSums[key] / count : 0;
     });
 
@@ -966,7 +1159,9 @@ const App: React.FC = () => {
         totalInvestment: 0,
         fishOutput: 0,
       };
-      const totalEmploymentGenerated = Math.floor(metrics.totalProjects * (5 + Math.random() * 10));
+      const totalEmploymentGenerated = Math.floor(
+        metrics.totalProjects * (5 + Math.random() * 10)
+      );
       const pmmsyMetrics: PMMSYAggregatedData = {
         totalProjects: metrics.totalProjects || 0,
         totalInvestment: metrics.totalInvestment || 0,
@@ -979,16 +1174,24 @@ const App: React.FC = () => {
         projectsByStateUT: [],
         sectorDistribution: [],
       };
-      const averageTotalEmploymentGenerated = Math.floor(averages.totalProjects * (5 + Math.random() * 10));
+      const averageTotalEmploymentGenerated = Math.floor(
+        averages.totalProjects * (5 + Math.random() * 10)
+      );
       const pmmsyAverages: PMMSYAggregatedData = {
         totalProjects: averages.totalProjects || 0,
         totalInvestment: averages.totalInvestment || 0,
         fishOutput: averages.fishOutput || 0,
         totalEmploymentGenerated: averageTotalEmploymentGenerated,
         directEmploymentMen: Math.floor(averageTotalEmploymentGenerated * 0.4),
-        directEmploymentWomen: Math.floor(averageTotalEmploymentGenerated * 0.3),
-        indirectEmploymentMen: Math.floor(averageTotalEmploymentGenerated * 0.2),
-        indirectEmploymentWomen: Math.floor(averageTotalEmploymentGenerated * 0.1),
+        directEmploymentWomen: Math.floor(
+          averageTotalEmploymentGenerated * 0.3
+        ),
+        indirectEmploymentMen: Math.floor(
+          averageTotalEmploymentGenerated * 0.2
+        ),
+        indirectEmploymentWomen: Math.floor(
+          averageTotalEmploymentGenerated * 0.1
+        ),
         projectsByStateUT: [],
         sectorDistribution: [],
       };
@@ -1018,22 +1221,32 @@ const App: React.FC = () => {
         averages,
       });
     }
-  };  
+  };
 
   // Handle drill down
   const handleDrillDown = (areaDetails: any) => {
-  // setSelectedState(stateName);
+    // setSelectedState(stateName);
     // setSelectedAreaDetails(null); // Ensure popup doesn't open
     if (!polygonData || !metricData) return;
 
     // Determine the group for averaging based on area type
     const getAverageGroup = (level: string, properties: any) => {
       if (level === "state") {
-        return polygonData.features.filter(f => f.properties.level === "state");
+        return polygonData.features.filter(
+          (f) => f.properties.level === "state"
+        );
       } else if (level === "district") {
-        return polygonData.features.filter(f => f.properties.level === "district" && f.properties.st_nm === properties.st_nm);
+        return polygonData.features.filter(
+          (f) =>
+            f.properties.level === "district" &&
+            f.properties.st_nm === properties.st_nm
+        );
       } else if (level === "sub-district") {
-        return polygonData.features.filter(f => f.properties.level === "sub-district" && f.properties.district_name === properties.district_name);
+        return polygonData.features.filter(
+          (f) =>
+            f.properties.level === "sub-district" &&
+            f.properties.district_name === properties.district_name
+        );
       }
       return [];
     };
@@ -1042,17 +1255,18 @@ const App: React.FC = () => {
     const metricSums: { [key: string]: number } = {};
     const count = group.length;
 
-    group.forEach(feature => {
-      const areaMetrics = metricData[feature.properties.shapeID]?.[demographicKey];
+    group.forEach((feature) => {
+      const areaMetrics =
+        metricData[feature.properties.shapeID]?.[demographicKey];
       if (areaMetrics) {
-        Object.keys(areaMetrics).forEach(key => {
+        Object.keys(areaMetrics).forEach((key) => {
           metricSums[key] = (metricSums[key] || 0) + (areaMetrics[key] || 0);
         });
       }
     });
 
     const averages: { [key: string]: number } = {};
-    Object.keys(metricSums).forEach(key => {
+    Object.keys(metricSums).forEach((key) => {
       averages[key] = count > 0 ? metricSums[key] / count : 0;
     });
 
@@ -1062,7 +1276,9 @@ const App: React.FC = () => {
         totalInvestment: 0,
         fishOutput: 0,
       };
-      const totalEmploymentGenerated = Math.floor(metrics.totalProjects * (5 + Math.random() * 10));
+      const totalEmploymentGenerated = Math.floor(
+        metrics.totalProjects * (5 + Math.random() * 10)
+      );
       const pmmsyMetrics: PMMSYAggregatedData = {
         totalProjects: metrics.totalProjects || 0,
         totalInvestment: metrics.totalInvestment || 0,
@@ -1075,20 +1291,28 @@ const App: React.FC = () => {
         projectsByStateUT: [],
         sectorDistribution: [],
       };
-      const averageTotalEmploymentGenerated = Math.floor(averages.totalProjects * (5 + Math.random() * 10));
+      const averageTotalEmploymentGenerated = Math.floor(
+        averages.totalProjects * (5 + Math.random() * 10)
+      );
       const pmmsyAverages: PMMSYAggregatedData = {
         totalProjects: averages.totalProjects || 0,
         totalInvestment: averages.totalInvestment || 0,
         fishOutput: averages.fishOutput || 0,
         totalEmploymentGenerated: averageTotalEmploymentGenerated,
         directEmploymentMen: Math.floor(averageTotalEmploymentGenerated * 0.4),
-        directEmploymentWomen: Math.floor(averageTotalEmploymentGenerated * 0.3),
-        indirectEmploymentMen: Math.floor(averageTotalEmploymentGenerated * 0.2),
-        indirectEmploymentWomen: Math.floor(averageTotalEmploymentGenerated * 0.1),
+        directEmploymentWomen: Math.floor(
+          averageTotalEmploymentGenerated * 0.3
+        ),
+        indirectEmploymentMen: Math.floor(
+          averageTotalEmploymentGenerated * 0.2
+        ),
+        indirectEmploymentWomen: Math.floor(
+          averageTotalEmploymentGenerated * 0.1
+        ),
         projectsByStateUT: [],
         sectorDistribution: [],
       };
-      setSelectedState(areaDetails.name|| "Unknown Area")
+      setSelectedState(areaDetails.name || "Unknown Area");
       setDrilledAreaDetails({
         ...areaDetails,
         name: areaDetails.name || "Unknown Area",
@@ -1106,7 +1330,7 @@ const App: React.FC = () => {
         beneficiaries_last_24h: 0,
         registrations_last_24h: 0,
       };
-      setSelectedState(areaDetails.name|| "Unknown Area")
+      setSelectedState(areaDetails.name || "Unknown Area");
       setDrilledAreaDetails({
         ...areaDetails,
         name: areaDetails.name || "Unknown Area",
@@ -1116,8 +1340,7 @@ const App: React.FC = () => {
         averages,
       });
     }
-};
-
+  };
 
   // Handle back to national view
   const handleBack = () => {
@@ -1127,7 +1350,14 @@ const App: React.FC = () => {
 
   // Data for state category breakdown table
   const categoryBreakdownData = useMemo(() => {
-    if (!selectedState || !filteredGeoJsonData || !combinedMetricData || !mockNonPMMSYData || !mockPMMSYData) return [];
+    if (
+      !selectedState ||
+      !filteredGeoJsonData ||
+      !combinedMetricData ||
+      !mockNonPMMSYData ||
+      !mockPMMSYData
+    )
+      return [];
 
     const districtFeatures = filteredGeoJsonData.features.filter(
       (f) => f.properties.level === "district"
@@ -1145,15 +1375,19 @@ const App: React.FC = () => {
       if (selectedBarChartCategory === "gender") {
         categories = ["male", "female", "transgender"];
         displayNames = genderDisplayNames;
-        getDemographicKey = (key) => `PMMSY_${key}_${selectedFinancialYearPMMSY}_${selectedSectorPMMSY}`;
+        getDemographicKey = (key) =>
+          `PMMSY_${key}_${selectedFinancialYearPMMSY}_${selectedSectorPMMSY}`;
       } else if (selectedBarChartCategory === "year") {
         categories = ["2021", "2022", "2023", "2024"];
         displayNames = yearDisplayNames;
-        getDemographicKey = (key) => `PMMSY_${selectedGender}_${key}_${selectedSectorPMMSY}`;
-      } else { // scheme (sectors for PMMSY)
+        getDemographicKey = (key) =>
+          `PMMSY_${selectedGender}_${key}_${selectedSectorPMMSY}`;
+      } else {
+        // scheme (sectors for PMMSY)
         categories = ["Inland", "Marine"];
         displayNames = { Inland: "Inland", Marine: "Marine" };
-        getDemographicKey = (key) => `PMMSY_${selectedGender}_${selectedFinancialYearPMMSY}_${key}`;
+        getDemographicKey = (key) =>
+          `PMMSY_${selectedGender}_${selectedFinancialYearPMMSY}_${key}`;
       }
     } else {
       dataSource = mockNonPMMSYData;
@@ -1164,8 +1398,10 @@ const App: React.FC = () => {
       } else if (selectedBarChartCategory === "year") {
         categories = ["2021", "2022", "2023", "2024"];
         displayNames = yearDisplayNames;
-        getDemographicKey = (key) => `${selectedScheme}_${selectedGender}_${key}`;
-      } else { // scheme
+        getDemographicKey = (key) =>
+          `${selectedScheme}_${selectedGender}_${key}`;
+      } else {
+        // scheme
         categories = ["PMMKSS", "KCC", "NFDP"];
         displayNames = schemeDisplayNames;
         getDemographicKey = (key) => `${key}_${selectedGender}_${selectedYear}`;
@@ -1180,7 +1416,9 @@ const App: React.FC = () => {
       const fullKey = getDemographicKey(cat);
       let total = 0;
       districtIds.forEach((id) => {
-        total += dataSource?.[id]?.[fullKey]?.[selectedMetric as keyof MetricValues] || 0;
+        total +=
+          dataSource?.[id]?.[fullKey]?.[selectedMetric as keyof MetricValues] ||
+          0;
       });
       totals[cat] = total;
     });
@@ -1204,7 +1442,7 @@ const App: React.FC = () => {
     selectedMetric,
   ]);
 
-   // Scheme Selection View
+  // Scheme Selection View
   const SchemeSelectionView = () => {
     if (!schemeTotals) {
       return (
@@ -1214,37 +1452,60 @@ const App: React.FC = () => {
       );
     }
 
-    const schemes: SchemeKey[] = ['PMMKSS', 'PMMSY', 'KCC', 'NFDP'];
+    const schemes: SchemeKey[] = ["PMMKSS", "PMMSY", "KCC", "NFDP"];
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-  <div className="max-w-4xl w-full px-4">
-    <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">Select a Scheme</h1>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {schemes.map((scheme) => (
-        <div
-          key={scheme}
-          className="backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-6 cursor-pointer hover:shadow-xl transition-transform hover:scale-105"
-          onClick={() => setSelectedScheme(scheme)}
-          style={{ backgroundColor: categoryColors[scheme] }}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-white">{schemeDisplayNames[scheme]}</h2>
-              <p className="text-2xl font-bold text-white mt-2">
-                ₹{formatNumber(schemeTotals[scheme])}
-              </p>
-              <p className="text-sm text-white/80 mt-1">Total Funds Allocated</p>
-            </div>
-            <div className="p-3 bg-white/20 rounded-xl">
-              {schemeIcons[scheme]}
-            </div>
+        <div className="max-w-4xl w-full px-4">
+          <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">
+            Select a Scheme
+          </h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {schemes.map((scheme) => (
+              <div
+                key={scheme}
+                className="backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-6 cursor-pointer hover:shadow-xl transition-transform hover:scale-105"
+                onClick={() => setSelectedScheme(scheme)}
+                style={{ backgroundColor: categoryColors[scheme] }}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">
+                      {schemeDisplayNames[scheme]}
+                    </h2>
+                    {scheme === "PMMSY" ? (
+                      <>
+                        <p className="text-2xl font-bold text-white mt-2">
+                          {formatMetricValue(
+                            "totalInvestment",
+                            globalPMMSYMetrics.totalInvestment
+                          )}
+                        </p>
+                        <p className="text-sm text-white/80 mt-1">
+                          Total Investment
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-2xl font-bold text-white mt-2">
+                          {formatMetricValue("funds", schemeTotals[scheme]/10)}
+                        </p>
+                        <p className="text-sm text-white/80 mt-1">
+                          Total Funds Allocated
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    {schemeIcons[scheme]}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      ))}
-    </div>
-  </div>
-</div>
+      </div>
     );
   };
 
@@ -1253,7 +1514,9 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-lg border-l-4 border-red-500">
-          <h2 className="text-xl font-bold text-red-600 mb-2">Error Loading Dashboard</h2>
+          <h2 className="text-xl font-bold text-red-600 mb-2">
+            Error Loading Dashboard
+          </h2>
           <p className="text-red-800">{error}</p>
         </div>
       </div>
@@ -1266,7 +1529,9 @@ const App: React.FC = () => {
         <div className="bg-white p-8 rounded-lg shadow-lg">
           <div className="flex items-center space-x-3">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="text-lg font-medium text-gray-900">Loading dashboard...</p>
+            <p className="text-lg font-medium text-gray-900">
+              Loading dashboard...
+            </p>
           </div>
         </div>
       </div>
@@ -1297,14 +1562,23 @@ const App: React.FC = () => {
             </div>
             {selectedScheme && (
               <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-x-2">
-                <label htmlFor="metric-select" className="font-semibold text-xs sm:text-sm">
+                <label
+                  htmlFor="metric-select"
+                  className="font-semibold text-xs sm:text-sm"
+                >
                   Metric
                 </label>
                 <select
                   id="metric-select"
                   value={selectedMetric}
                   onChange={(e) =>
-                    setSelectedMetric(e.target.value as "beneficiaries" | "funds" | "registrations" | PMMSYMetricKey)
+                    setSelectedMetric(
+                      e.target.value as
+                        | "beneficiaries"
+                        | "funds"
+                        | "registrations"
+                        | PMMSYMetricKey
+                    )
                   }
                   className="p-1 bg-gray-50 border border-gray-300 rounded-md text-xs sm:text-sm"
                 >
@@ -1327,7 +1601,10 @@ const App: React.FC = () => {
             {selectedScheme && (
               <div className="flex items-center gap-x-2">
                 <button
-                  onClick={() => { setMapView("state"); setSelectedState(null); }}
+                  onClick={() => {
+                    setMapView("state");
+                    setSelectedState(null);
+                  }}
                   className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                     mapView === "state"
                       ? "bg-blue-600 text-white shadow-md"
@@ -1388,188 +1665,314 @@ const App: React.FC = () => {
               getMetricIcon={getMetricIcon}
             />
 
-        {/* Main Content */}
-        <div className="grid grid-cols-5 gap-2">
-          <div className="col-span-3 bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 transition-all duration-300 relative">
-            {selectedState ? (
-              <div className="p-4 space-y-4">
-                <button
-                  onClick={handleBack}
-                  className="mb-4 bg-white px-4 py-2 rounded-md shadow-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-                >
-                  Back to National View
-                </button>
-                {drilledAreaDetails && (
-      <div className="bg-white p-4 rounded-lg shadow space-y-2">
-        <h2 className="text-xl font-bold mb-4">{drilledAreaDetails.name}</h2>
+            {/* Main Content */}
+            <div className="grid grid-cols-5 gap-2">
+              <div className="col-span-3 bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 transition-all duration-300 relative">
+                {selectedState ? (
+                  <div className="p-4 space-y-4">
+                    <button
+                      onClick={handleBack}
+                      className="mb-4 bg-white px-4 py-2 rounded-md shadow-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+                    >
+                      Back to National View
+                    </button>
+                    {drilledAreaDetails && (
+                      <div className="bg-white p-4 rounded-lg shadow space-y-2">
+                        <h2 className="text-xl font-bold mb-4">
+                          {drilledAreaDetails.name}
+                        </h2>
 
-        {selectedScheme === "PMMSY" ? (
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="font-semibold">Total Projects</p>
-              <p>{formatMetricValue("totalProjects", drilledAreaDetails.pmmsyMetrics.totalProjects)}</p>
-            </div>
-            <div>
-              <p className="font-semibold">Total Investment</p>
-              <p>{formatMetricValue("totalInvestment", drilledAreaDetails.pmmsyMetrics.totalInvestment)}</p>
-            </div>
-            <div>
-              <p className="font-semibold">Fish Output</p>
-              <p>{formatMetricValue("fishOutput", drilledAreaDetails.pmmsyMetrics.fishOutput)}</p>
-            </div>
-            <div>
-              <p className="font-semibold">Total Employment Generated</p>
-              <p>{formatMetricValue("totalProjects", drilledAreaDetails.pmmsyMetrics.totalEmploymentGenerated)}</p>
-            </div>
-            <div>
-              <p className="font-semibold">Direct Employment (Men)</p>
-              <p>{formatMetricValue("totalProjects", drilledAreaDetails.pmmsyMetrics.directEmploymentMen)}</p>
-            </div>
-            <div>
-              <p className="font-semibold">Direct Employment (Women)</p>
-              <p>{formatMetricValue("totalProjects", drilledAreaDetails.pmmsyMetrics.directEmploymentWomen)}</p>
-            </div>
-            <div>
-              <p className="font-semibold">Indirect Employment (Men)</p>
-              <p>{formatMetricValue("totalProjects", drilledAreaDetails.pmmsyMetrics.indirectEmploymentMen)}</p>
-            </div>
-            <div>
-              <p className="font-semibold">Indirect Employment (Women)</p>
-              <p>{formatMetricValue("totalProjects", drilledAreaDetails.pmmsyMetrics.indirectEmploymentWomen)}</p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="font-semibold">Total Funds Allocated</p>
-              <p>{formatMetricValue("funds", drilledAreaDetails.metrics.funds)}</p>
-            </div>
-            <div>
-              <p className="font-semibold">Funds Utilized</p>
-              <p>{formatMetricValue("funds_used", drilledAreaDetails.metrics.funds_used)}</p>
-            </div>
-            <div>
-              <p className="font-semibold">Total Beneficiaries</p>
-              <p>{formatMetricValue("beneficiaries", drilledAreaDetails.metrics.beneficiaries)}</p>
-            </div>
-            <div>
-              <p className="font-semibold">New Beneficiaries (Last 24h)</p>
-              <p>{formatMetricValue("beneficiaries_last_24h", drilledAreaDetails.metrics.beneficiaries_last_24h)}</p>
-            </div>
-            <div>
-              <p className="font-semibold">Total Registrations</p>
-              <p>{formatMetricValue("registrations", drilledAreaDetails.metrics.registrations)}</p>
-            </div>
-            <div>
-              <p className="font-semibold">New Registrations (Last 24h)</p>
-              <p>{formatMetricValue("registrations_last_24h", drilledAreaDetails.metrics.registrations_last_24h)}</p>
-            </div>
-          </div>
-        )}
-      </div>
-    )}
-              </div>
-            ) : (
-              <OpenLayersMap
-                geoJsonData={filteredGeoJsonData}
-                metricData={metricData}
-                selectedMetric={selectedMetric}
-                demographicKey={demographicKey}
-                getColor={getColor}
-                formatMetricValue={formatMetricValue}
-                getFullMetricName={getFullMetricName}
-                officerNames={officerNames}
-                onAreaClick={handleAreaClick}
-                onDrillDown={handleDrillDown}
-                mapView={mapView}
-                isDrilledDown={!!selectedState}
-              />
-            )}
-            {!selectedState && (
-              <div className="absolute bottom-4 left-4 bg-white/90 p-3 rounded-lg shadow-md border border-gray-200">
-                <h4 className="text-sm font-semibold mb-2 text-gray-800">
-                  {getMetricDisplayName(selectedMetric)} Legend
-                </h4>
-                <div className="space-y-1">
-                  {brackets[selectedMetric].map((bracket, index) => (
-                    <div key={index} className="flex items-center">
-                      <div className="w-4 h-4 mr-2 rounded-sm" style={{ backgroundColor: bracket.color }}></div>
-                      <span className="text-xs text-gray-700">{bracket.label}</span>
+                        {selectedScheme === "PMMSY" ? (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="font-semibold">Total Projects</p>
+                              <p>
+                                {formatMetricValue(
+                                  "totalProjects",
+                                  drilledAreaDetails.pmmsyMetrics.totalProjects
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-semibold">Total Investment</p>
+                              <p>
+                                {formatMetricValue(
+                                  "totalInvestment",
+                                  drilledAreaDetails.pmmsyMetrics
+                                    .totalInvestment
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-semibold">Fish Output</p>
+                              <p>
+                                {formatMetricValue(
+                                  "fishOutput",
+                                  drilledAreaDetails.pmmsyMetrics.fishOutput
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-semibold">
+                                Total Employment Generated
+                              </p>
+                              <p>
+                                {formatMetricValue(
+                                  "totalProjects",
+                                  drilledAreaDetails.pmmsyMetrics
+                                    .totalEmploymentGenerated
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-semibold">
+                                Direct Employment (Men)
+                              </p>
+                              <p>
+                                {formatMetricValue(
+                                  "totalProjects",
+                                  drilledAreaDetails.pmmsyMetrics
+                                    .directEmploymentMen
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-semibold">
+                                Direct Employment (Women)
+                              </p>
+                              <p>
+                                {formatMetricValue(
+                                  "totalProjects",
+                                  drilledAreaDetails.pmmsyMetrics
+                                    .directEmploymentWomen
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-semibold">
+                                Indirect Employment (Men)
+                              </p>
+                              <p>
+                                {formatMetricValue(
+                                  "totalProjects",
+                                  drilledAreaDetails.pmmsyMetrics
+                                    .indirectEmploymentMen
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-semibold">
+                                Indirect Employment (Women)
+                              </p>
+                              <p>
+                                {formatMetricValue(
+                                  "totalProjects",
+                                  drilledAreaDetails.pmmsyMetrics
+                                    .indirectEmploymentWomen
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="font-semibold">
+                                Total Funds Allocated
+                              </p>
+                              <p>
+                                {formatMetricValue(
+                                  "funds",
+                                  drilledAreaDetails.metrics.funds
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-semibold">Funds Utilized</p>
+                              <p>
+                                {formatMetricValue(
+                                  "funds_used",
+                                  drilledAreaDetails.metrics.funds_used
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-semibold">
+                                Total Beneficiaries
+                              </p>
+                              <p>
+                                {formatMetricValue(
+                                  "beneficiaries",
+                                  drilledAreaDetails.metrics.beneficiaries
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-semibold">
+                                New Beneficiaries (Last 24h)
+                              </p>
+                              <p>
+                                {formatMetricValue(
+                                  "beneficiaries_last_24h",
+                                  drilledAreaDetails.metrics
+                                    .beneficiaries_last_24h
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-semibold">
+                                Total Registrations
+                              </p>
+                              <p>
+                                {formatMetricValue(
+                                  "registrations",
+                                  drilledAreaDetails.metrics.registrations
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-semibold">
+                                New Registrations (Last 24h)
+                              </p>
+                              <p>
+                                {formatMetricValue(
+                                  "registrations_last_24h",
+                                  drilledAreaDetails.metrics
+                                    .registrations_last_24h
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <OpenLayersMap
+                    geoJsonData={filteredGeoJsonData}
+                    metricData={metricData}
+                    selectedMetric={selectedMetric}
+                    demographicKey={demographicKey}
+                    getColor={getColor}
+                    formatMetricValue={formatMetricValue}
+                    getFullMetricName={getFullMetricName}
+                    officerNames={officerNames}
+                    onAreaClick={handleAreaClick}
+                    onDrillDown={handleDrillDown}
+                    mapView={mapView}
+                    isDrilledDown={!!selectedState}
+                  />
+                )}
+                {!selectedState && (
+                  <div className="absolute bottom-4 left-4 bg-white/90 p-3 rounded-lg shadow-md border border-gray-200">
+                    <h4 className="text-sm font-semibold mb-2 text-gray-800">
+                      {getMetricDisplayName(selectedMetric)} Legend
+                    </h4>
+                    <div className="space-y-1">
+                      {brackets[selectedMetric].map((bracket, index) => (
+                        <div key={index} className="flex items-center">
+                          <div
+                            className="w-4 h-4 mr-2 rounded-sm"
+                            style={{ backgroundColor: bracket.color }}
+                          ></div>
+                          <span className="text-xs text-gray-700">
+                            {bracket.label}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          <div className={`${selectedAreaDetails ? "col-span-2" : "col-span-2"} space-y-2 ${selectedAreaDetails ? "block" : "hidden"} lg:block`}>
-            {selectedScheme === "PMMSY" ? (
-              <><div className="flex flex-row gap-2">
-                <div className="flex-1">
-                  <SectorDistributionPieChart
-                    sectorDistribution={globalPMMSYMetrics.sectorDistribution}
-                    getColor={getColor}
-                  />
-                </div>
-                <div className="flex-1">
-                  <EmploymentBarChart
-                    employmentData={{
-                      directEmploymentMen: globalPMMSYMetrics.directEmploymentMen,
-                      directEmploymentWomen: globalPMMSYMetrics.directEmploymentWomen,
-                      indirectEmploymentMen: globalPMMSYMetrics.indirectEmploymentMen,
-                      indirectEmploymentWomen: globalPMMSYMetrics.indirectEmploymentWomen,
-                    }}
-                    getColor={getColor}
-                  />
-                </div>
+              <div
+                className={`${
+                  selectedAreaDetails ? "col-span-2" : "col-span-2"
+                } space-y-2 ${
+                  selectedAreaDetails ? "block" : "hidden"
+                } lg:block`}
+              >
+                {selectedScheme === "PMMSY" ? (
+                  <>
+                    <div className="flex flex-row gap-2">
+                      <div className="flex-1">
+                        <SectorDistributionPieChart
+                          sectorDistribution={
+                            globalPMMSYMetrics.sectorDistribution
+                          }
+                          getColor={getColor}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <EmploymentBarChart
+                          employmentData={{
+                            directEmploymentMen:
+                              globalPMMSYMetrics.directEmploymentMen,
+                            directEmploymentWomen:
+                              globalPMMSYMetrics.directEmploymentWomen,
+                            indirectEmploymentMen:
+                              globalPMMSYMetrics.indirectEmploymentMen,
+                            indirectEmploymentWomen:
+                              globalPMMSYMetrics.indirectEmploymentWomen,
+                          }}
+                          getColor={getColor}
+                        />
+                      </div>
+                    </div>
+                    <TopAreasBarChart
+                      barChartData={pmmsyBarData.data}
+                      barChartKeys={pmmsyBarData.keys}
+                      barChartDisplayNamesMap={pmmsyBarData.displayNamesMap}
+                      selectedMetric={selectedMetric}
+                      getColor={getColor}
+                      formatMetricValue={formatMetricValue}
+                      mapView={mapView}
+                      selectedBarChartCategory={selectedBarChartCategory}
+                      setSelectedBarChartCategory={setSelectedBarChartCategory}
+                      selectedScheme={selectedScheme}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <DistributionPieChart
+                      pieData={pieData}
+                      selectedMetric={selectedMetric}
+                    />
+                    <TopAreasBarChart
+                      barChartData={barChartData}
+                      barChartKeys={barChartKeys}
+                      barChartDisplayNamesMap={barChartDisplayNamesMap}
+                      selectedMetric={selectedMetric}
+                      getColor={getColor}
+                      formatMetricValue={formatMetricValue}
+                      mapView={mapView}
+                      selectedBarChartCategory={selectedBarChartCategory}
+                      setSelectedBarChartCategory={setSelectedBarChartCategory}
+                      selectedScheme={selectedScheme}
+                    />
+                  </>
+                )}
               </div>
-              <TopAreasBarChart
-                barChartData={pmmsyBarData.data}
-                barChartKeys={pmmsyBarData.keys}
-                barChartDisplayNamesMap={pmmsyBarData.displayNamesMap}
-                selectedMetric={selectedMetric}
-                getColor={getColor}
-                formatMetricValue={formatMetricValue}
-                mapView={mapView}
-                selectedBarChartCategory={selectedBarChartCategory}
-                setSelectedBarChartCategory={setSelectedBarChartCategory}
-                selectedScheme={selectedScheme}
-              /></>
-            ) : (
-              <>
-                <DistributionPieChart pieData={pieData} selectedMetric={selectedMetric} />
-                <TopAreasBarChart
-                  barChartData={barChartData}
-                  barChartKeys={barChartKeys}
-                  barChartDisplayNamesMap={barChartDisplayNamesMap}
-                  selectedMetric={selectedMetric}
-                  getColor={getColor}
-                  formatMetricValue={formatMetricValue}
-                  mapView={mapView}
-                  selectedBarChartCategory={selectedBarChartCategory}
-                  setSelectedBarChartCategory={setSelectedBarChartCategory}
-                  selectedScheme={selectedScheme}
-                />
-              </>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* Area Details Popup */}
-        <AreaDetailsPopup
+            {/* Area Details Popup */}
+            <AreaDetailsPopup
               selectedAreaDetails={selectedAreaDetails}
               selectedScheme={selectedScheme}
               formatMetricValue={formatMetricValue}
               setSelectedAreaDetails={setSelectedAreaDetails}
             />
           </>
-            )}
+        )}
       </main>
 
       <footer className="bg-white/80 backdrop-blur-md border-t border-white/20 mt-2">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="text-center text-gray-600">
-            <p>© 2025 Department of Fisheries Dashboard. All rights reserved.</p>
-            <p className="text-sm mt-2">Supporting sustainable fisheries development</p>
+            <p>
+              © 2025 Department of Fisheries Dashboard. All rights reserved.
+            </p>
+            <p className="text-sm mt-2">
+              Supporting sustainable fisheries development
+            </p>
           </div>
         </div>
       </footer>
