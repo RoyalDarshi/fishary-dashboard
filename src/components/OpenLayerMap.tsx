@@ -28,6 +28,8 @@ interface OpenLayersMapProps {
   onDrillDown: (details: any | null) => void;
   mapView: "state" | "sub-district" | "district"; // Updated prop to control map view
   isDrilledDown: boolean;
+  center?: [number, number];
+  zoom?: number;
 }
 
 const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
@@ -43,6 +45,8 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
   onDrillDown,
   mapView, // Destructure the new mapView prop
   isDrilledDown,
+  center,
+  zoom,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<Map | null>(null);
@@ -60,7 +64,7 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
   const onAreaClickRef = useRef(onAreaClick);
   const onDrillDownRef = useRef(onDrillDown);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-const lastClickedFeatureRef = useRef<any>(null);
+  const lastClickedFeatureRef = useRef<any>(null);
 
   // Update refs whenever the corresponding prop/state changes
   useEffect(() => {
@@ -96,16 +100,17 @@ const lastClickedFeatureRef = useRef<any>(null);
       source: vectorSrc,
     });
     setVectorLayer(initialVectorLayer);
-
+    console.log("Zoom level:", zoom);
     const newMap = new Map({
       target: mapRef.current,
       layers: [initialVectorLayer],
       view: new View({
-        center: fromLonLat([78.9628, 23.5937]),
-        zoom: 4.9,
+        center: center ? fromLonLat(center) : fromLonLat([78.9629, 20.5937]),
+        zoom: zoom || 5,
         minZoom: 4.5,
         maxZoom: 18,
       }),
+
       controls: [
         new Zoom({
           className: "ol-zoom custom-zoom",
@@ -221,6 +226,13 @@ const lastClickedFeatureRef = useRef<any>(null);
       }
     });
 
+    //make curson pointer on hover
+    newMap.on("pointermove", (evt) => {
+      const pixel = newMap.getEventPixel(evt.originalEvent);
+      const hit = newMap.hasFeatureAtPixel(pixel);
+      newMap.getTargetElement().style.cursor = hit ? "pointer" : "";
+    });
+
     // Add click functionality for area details popup - uses refs for dynamic data
     newMap.on("singleclick", (evt) => {
       const features = newMap.getFeaturesAtPixel(evt.pixel);
@@ -254,95 +266,96 @@ const lastClickedFeatureRef = useRef<any>(null);
         lastClickedFeatureRef.current = featureToClick;
         clickTimeoutRef.current = setTimeout(() => {
           const properties = featureToClick.getProperties();
+          const id = properties.shapeID;
+          const name = properties.shapeName || "Unknown Area";
+          const level = properties.level;
+
+          const currentMetricData = metricDataRef.current; // Use ref
+          const currentDemographicKey = demographicKeyRef.current; // Use ref
+          const currentOfficerNames = officerNamesRef.current; // Use ref
+          const currentOnAreaClick = onAreaClickRef.current; // Use ref
+
+          if (
+            (currentMapView === "state" && level === "state") ||
+            (currentMapView === "district" && level === "district") || // Added district condition
+            (currentMapView === "sub-district" && level === "sub-district")
+          ) {
+            const areaAllMetrics =
+              currentMetricData?.[id]?.[currentDemographicKey];
+
+            const details = {
+              id,
+              name,
+              officer: currentOfficerNames[id] || "N/A",
+              metrics: areaAllMetrics,
+              level: level, // Pass level to details
+              st_nm: properties.st_nm,
+              district_name: properties.district_name,
+            };
+            currentOnAreaClick(details);
+            // Hide tooltip when popup is active
+            if (tooltipElement) {
+              tooltipElement.style.display = "none";
+            }
+          } else {
+            currentOnAreaClick(null); // Close the popup if a non-relevant feature is clicked
+          }
+        }, 0); // 300ms delay to detect double-click
+      }
+    });
+
+    // Add double-click for drill-down
+    newMap.on("dblclick", (evt) => {
+      // Clear single-click timeout so popup won't trigger
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+        clickTimeoutRef.current = null;
+      }
+
+      const features = newMap.getFeaturesAtPixel(evt.pixel);
+      let featureToDrill = null;
+
+      if (features && features.length > 0) {
+        featureToDrill = features.find(
+          (f) => f.getProperties().level === "state"
+        );
+      }
+
+      if (featureToDrill) {
+        const properties = featureToDrill.getProperties();
         const id = properties.shapeID;
         const name = properties.shapeName || "Unknown Area";
         const level = properties.level;
 
-        const currentMetricData = metricDataRef.current; // Use ref
-        const currentDemographicKey = demographicKeyRef.current; // Use ref
-        const currentOfficerNames = officerNamesRef.current; // Use ref
-        const currentOnAreaClick = onAreaClickRef.current; // Use ref
+        const currentMetricData = metricDataRef.current;
+        const currentDemographicKey = demographicKeyRef.current;
+        const currentOfficerNames = officerNamesRef.current;
 
-        if (
-          (currentMapView === "state" && level === "state") ||
-          (currentMapView === "district" && level === "district") || // Added district condition
-          (currentMapView === "sub-district" && level === "sub-district")
-        ) {
-          const areaAllMetrics =
-            currentMetricData?.[id]?.[currentDemographicKey];
+        const areaAllMetrics = currentMetricData?.[id]?.[currentDemographicKey];
 
-          const details = {
-            id,
-            name,
-            officer: currentOfficerNames[id] || "N/A",
-            metrics: areaAllMetrics,
-            level: level, // Pass level to details
-            st_nm: properties.st_nm,
-            district_name: properties.district_name,
-          };
-          currentOnAreaClick(details);
-          // Hide tooltip when popup is active
-          if (tooltipElement) {
-            tooltipElement.style.display = "none";
-          }
-        } else {
-          currentOnAreaClick(null); // Close the popup if a non-relevant feature is clicked
-        }
-    }, 0); // 300ms delay to detect double-click
-  }
+        const details = {
+          id,
+          name,
+          officer: currentOfficerNames[id] || "N/A",
+          metrics: areaAllMetrics,
+          level: level,
+          st_nm: properties.st_nm,
+          district_name: properties.district_name,
+        };
+
+        onDrillDownRef.current(details);
+      }
     });
-
-// Add double-click for drill-down
-newMap.on("dblclick", (evt) => {
-  // Clear single-click timeout so popup won't trigger
-  if (clickTimeoutRef.current) {
-    clearTimeout(clickTimeoutRef.current);
-    clickTimeoutRef.current = null;
-  }
-
-  const features = newMap.getFeaturesAtPixel(evt.pixel);
-  let featureToDrill = null;
-
-  if (features && features.length > 0) {
-    featureToDrill = features.find((f) => f.getProperties().level === "state");
-  }
-
-  if (featureToDrill) {
-    const properties = featureToDrill.getProperties();
-    const id = properties.shapeID;
-    const name = properties.shapeName || "Unknown Area";
-    const level = properties.level;
-
-    const currentMetricData = metricDataRef.current;
-    const currentDemographicKey = demographicKeyRef.current;
-    const currentOfficerNames = officerNamesRef.current;
-
-    const areaAllMetrics = currentMetricData?.[id]?.[currentDemographicKey];
-
-    const details = {
-      id,
-      name,
-      officer: currentOfficerNames[id] || "N/A",
-      metrics: areaAllMetrics,
-      level: level,
-      st_nm: properties.st_nm,
-      district_name: properties.district_name,
-    };
-
-    onDrillDownRef.current(details);
-  }
-});
-
 
     setMap(newMap);
 
     // Cleanup function for map
     return () => {
-  newMap.setTarget(undefined);
-  if (clickTimeoutRef.current) {
-    clearTimeout(clickTimeoutRef.current);
-  }
-};
+      newMap.setTarget(undefined);
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+      }
+    };
   }, []); // Empty dependency array: this effect runs only once on mount
 
   // Update map data (features) when geoJsonData changes
@@ -367,7 +380,7 @@ newMap.on("dblclick", (evt) => {
       if (isDrilledDown || mapView === "state") {
         map.getView().fit(extent, {
           duration: 500,
-          padding: [100, 100, 100, 100],
+          padding: [0, 0, 0, 0],
         });
       }
     }

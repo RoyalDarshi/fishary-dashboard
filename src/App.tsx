@@ -1,8 +1,17 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { MapPin, Users, IndianRupee, TrendingUp, Fish } from "lucide-react";
+import {
+  MapPin,
+  Users,
+  IndianRupee,
+  TrendingUp,
+  Fish,
+  ArrowLeft,
+  Undo2,
+} from "lucide-react";
 import OpenLayersMap from "./components/OpenLayerMap";
 import AreaDetailsPopup from "./components/AreaDetailsPopup";
 import FiltersAndKPIs from "./components/FiltersAndKPIs";
+import BiharFullTable from "./components/BiharFullTable";
 import {
   SectorDistributionPieChart,
   DistributionPieChart,
@@ -137,6 +146,7 @@ const App: React.FC = () => {
     "state"
   );
   const [selectedState, setSelectedState] = useState<string | null>(null);
+  const [biharGeoJson, setBiharGeoJson] = useState<any | null>(null);
   const [globalPMMSYMetrics, setGlobalPMMSYMetrics] =
     useState<PMMSYAggregatedData>({
       totalProjects: 0,
@@ -491,6 +501,95 @@ const App: React.FC = () => {
       });
   }, [combinedMetricData]);
 
+  useEffect(() => {
+    fetch("/bihar1.geojson")
+      .then((res) => res.json())
+      .then((data) => {
+        const normalized = {
+          ...data,
+          features: data.features.map((f: any, idx: number) => ({
+            ...f,
+            properties: {
+              ...f.properties,
+              shapeID: f.properties.Dist_Code?.toString() || `bihar_${idx}`,
+              shapeName: f.properties.Dist_Name,
+              st_nm: f.properties.State_Name || "Bihar",
+              district_name: f.properties.Dist_Name,
+              level: "district",
+            },
+          })),
+        };
+
+        setBiharGeoJson(normalized);
+
+        // ✅ Generate Bihar district metrics based on Bihar state data
+        setMetricData((prev: any) => {
+          if (!prev) return prev;
+
+          // Find Bihar state metrics from India map
+          const biharStateId = Object.keys(prev).find((id) =>
+            polygonData?.features.some(
+              (f) =>
+                f.properties.shapeID === id &&
+                f.properties.shapeName === "Bihar"
+            )
+          );
+
+          if (!biharStateId) return prev;
+
+          const biharStateMetrics = prev[biharStateId];
+
+          // Distribute Bihar totals randomly across districts
+          const biharMetrics = distributeBiharMetrics(
+            biharStateMetrics,
+            normalized.features
+          );
+
+          return { ...prev, ...biharMetrics };
+        });
+      })
+      .catch((err) => console.error("Failed to load Bihar GeoJSON:", err));
+  }, [polygonData]);
+
+  // Distribute Bihar state metrics randomly across its districts
+  // Distribute Bihar state metrics randomly across its districts
+  const distributeBiharMetrics = (
+    biharStateMetrics: AreaMetricData,
+    districts: GeoJSONFeature[]
+  ): Record<string, AreaMetricData> => {
+    const districtMetrics: Record<string, AreaMetricData> = {};
+
+    Object.entries(biharStateMetrics).forEach(([key, metrics]: any) => {
+      Object.entries(metrics).forEach(([mKey, mVal]) => {
+        if (typeof mVal !== "number") return;
+
+        // 1. Random weights for districts
+        const weights = districts.map(() => Math.random());
+        const totalWeight = weights.reduce((a, b) => a + b, 0);
+        const normalizedWeights = weights.map((w) => w / totalWeight);
+
+        // 2. Assign values with random distribution
+        const tempValues = normalizedWeights.map((w) => mVal * w);
+
+        // 3. Rescale so sum matches Bihar state total
+        const sumTemp = tempValues.reduce((a, b) => a + b, 0);
+        const scale = mVal / sumTemp;
+
+        districts.forEach((dist, idx) => {
+          const distId = dist.properties.shapeID;
+          if (!districtMetrics[distId]) districtMetrics[distId] = {};
+          if (!districtMetrics[distId][key]) districtMetrics[distId][key] = {};
+
+          districtMetrics[distId][key][mKey] = Math.floor(
+            tempValues[idx] * scale
+          );
+        });
+      });
+    });
+
+    return districtMetrics;
+  };
+
   // Update selectedMetric when scheme changes
   useEffect(() => {
     if (selectedScheme === "PMMSY") {
@@ -785,14 +884,15 @@ const App: React.FC = () => {
       metric === "totalInvestment"
     ) {
       if (mapView === "district" && selectedScheme === "PMMSY")
-        return `₹${formatNumber(value/20)}`;
+        return `₹${formatNumber(value / 20)}`;
       else if (mapView === "sub-district" && selectedScheme === "PMMSY")
-        return `₹${formatNumber(value/200)}`;
+        return `₹${formatNumber(value / 200)}`;
       return `₹${formatNumber(value)}`;
     }
     if (metric === "fishOutput") {
       if (mapView === "district") return `${(value / 20).toFixed(2)} Tonnes`;
-      if (mapView === "sub-district") return `${(value / 200).toFixed(2)} Tonnes`;
+      if (mapView === "sub-district")
+        return `${(value / 200).toFixed(2)} Tonnes`;
       return `${value.toFixed(2)} Tonnes`;
     }
     return formatNumber(value);
@@ -1108,6 +1208,8 @@ const App: React.FC = () => {
     setSelectedState(null);
   };
 
+  const isBiharView = selectedState === "Bihar";
+
   // Handle area click
   const handleAreaClick = (areaDetails: any) => {
     if (!polygonData || !metricData) return;
@@ -1225,8 +1327,6 @@ const App: React.FC = () => {
 
   // Handle drill down
   const handleDrillDown = (areaDetails: any) => {
-    // setSelectedState(stateName);
-    // setSelectedAreaDetails(null); // Ensure popup doesn't open
     if (!polygonData || !metricData) return;
 
     // Determine the group for averaging based on area type
@@ -1488,7 +1588,10 @@ const App: React.FC = () => {
                     ) : (
                       <>
                         <p className="text-2xl font-bold text-white mt-2">
-                          {formatMetricValue("funds", schemeTotals[scheme]/10)}
+                          {formatMetricValue(
+                            "funds",
+                            schemeTotals[scheme] / 10
+                          )}
                         </p>
                         <p className="text-sm text-white/80 mt-1">
                           Total Funds Allocated
@@ -1669,180 +1772,188 @@ const App: React.FC = () => {
             <div className="grid grid-cols-5 gap-2">
               <div className="col-span-3 bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 transition-all duration-300 relative">
                 {selectedState ? (
-                  <div className="p-4 space-y-4">
-                    <button
-                      onClick={handleBack}
-                      className="mb-4 bg-white px-4 py-2 rounded-md shadow-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-                    >
-                      Back to National View
-                    </button>
+                  <div className="p-2 space-y-2">
+                    <div className="relative flex justify-center items-center w-full">
+                      <button
+                        onClick={handleBack}
+                        className="absolute left-0 top--5 m-4 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition transform duration-200 ease-in-out flex items-center justify-center"
+                      >
+                        <Undo2 className="h-5 w-5" />
+                        <span className="sr-only">Back to National View</span>
+                      </button>
+                      <h2 className="text-6xl font-bold text-gray-600 bg-clip-text ">
+                        {drilledAreaDetails.name}
+                      </h2>
+                    </div>
                     {drilledAreaDetails && (
-                      <div className="bg-white p-4 rounded-lg shadow space-y-2">
-                        <h2 className="text-xl font-bold mb-4">
-                          {drilledAreaDetails.name}
-                        </h2>
+                      <div className="flex gap-2">
+                        {/* Left side: Data */}
+                        <div className="flex-1 bg-white p-2 rounded-2xl shadow-lg border border-gray-100">
+                          {selectedScheme === "PMMSY" ? (
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                              {[
+                                {
+                                  label: "Total Projects",
+                                  value:
+                                    drilledAreaDetails.pmmsyMetrics
+                                      .totalProjects,
+                                  key: "totalProjects",
+                                },
+                                {
+                                  label: "Total Investment",
+                                  value:
+                                    drilledAreaDetails.pmmsyMetrics
+                                      .totalInvestment,
+                                  key: "totalInvestment",
+                                },
+                                {
+                                  label: "Fish Output",
+                                  value:
+                                    drilledAreaDetails.pmmsyMetrics.fishOutput,
+                                  key: "fishOutput",
+                                },
+                                {
+                                  label: "Total Employment Generated",
+                                  value:
+                                    drilledAreaDetails.pmmsyMetrics
+                                      .totalEmploymentGenerated,
+                                  key: "totalProjects",
+                                },
+                                {
+                                  label: "Direct Employment (Men)",
+                                  value:
+                                    drilledAreaDetails.pmmsyMetrics
+                                      .directEmploymentMen,
+                                  key: "totalProjects",
+                                },
+                                {
+                                  label: "Direct Employment (Women)",
+                                  value:
+                                    drilledAreaDetails.pmmsyMetrics
+                                      .directEmploymentWomen,
+                                  key: "totalProjects",
+                                },
+                                {
+                                  label: "Indirect Employment (Men)",
+                                  value:
+                                    drilledAreaDetails.pmmsyMetrics
+                                      .indirectEmploymentMen,
+                                  key: "totalProjects",
+                                },
+                                {
+                                  label: "Indirect Employment (Women)",
+                                  value:
+                                    drilledAreaDetails.pmmsyMetrics
+                                      .indirectEmploymentWomen,
+                                  key: "totalProjects",
+                                },
+                              ].map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="bg-gradient-to-tr from-blue-50 to-indigo-50 rounded-xl p-4 shadow-sm hover:shadow-md transition"
+                                >
+                                  <p className="text-sm font-medium text-gray-600">
+                                    {item.label}
+                                  </p>
+                                  <p className="mt-1 text-lg font-semibold text-gray-900">
+                                    {formatMetricValue(item.key, item.value)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                              {[
+                                {
+                                  label: "Total Funds Allocated",
+                                  value: drilledAreaDetails.metrics.funds,
+                                  key: "funds",
+                                },
+                                {
+                                  label: "Funds Utilized",
+                                  value: drilledAreaDetails.metrics.funds_used,
+                                  key: "funds_used",
+                                },
+                                {
+                                  label: "Total Beneficiaries",
+                                  value:
+                                    drilledAreaDetails.metrics.beneficiaries,
+                                  key: "beneficiaries",
+                                },
+                                {
+                                  label: "New Beneficiaries (Last 24h)",
+                                  value:
+                                    drilledAreaDetails.metrics
+                                      .beneficiaries_last_24h,
+                                  key: "beneficiaries_last_24h",
+                                },
+                                {
+                                  label: "Total Registrations",
+                                  value:
+                                    drilledAreaDetails.metrics.registrations,
+                                  key: "registrations",
+                                },
+                                {
+                                  label: "New Registrations (Last 24h)",
+                                  value:
+                                    drilledAreaDetails.metrics
+                                      .registrations_last_24h,
+                                  key: "registrations_last_24h",
+                                },
+                              ].map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="bg-gradient-to-tr from-green-50 to-emerald-50 rounded-xl p-4 shadow-sm hover:shadow-md transition"
+                                >
+                                  <p className="text-sm font-medium text-gray-600">
+                                    {item.label}
+                                  </p>
+                                  <p className="mt-1 text-lg font-semibold text-gray-900">
+                                    {formatMetricValue(item.key, item.value)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
 
-                        {selectedScheme === "PMMSY" ? (
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <p className="font-semibold">Total Projects</p>
-                              <p>
-                                {formatMetricValue(
-                                  "totalProjects",
-                                  drilledAreaDetails.pmmsyMetrics.totalProjects
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="font-semibold">Total Investment</p>
-                              <p>
-                                {formatMetricValue(
-                                  "totalInvestment",
-                                  drilledAreaDetails.pmmsyMetrics
-                                    .totalInvestment
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="font-semibold">Fish Output</p>
-                              <p>
-                                {formatMetricValue(
-                                  "fishOutput",
-                                  drilledAreaDetails.pmmsyMetrics.fishOutput
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="font-semibold">
-                                Total Employment Generated
-                              </p>
-                              <p>
-                                {formatMetricValue(
-                                  "totalProjects",
-                                  drilledAreaDetails.pmmsyMetrics
-                                    .totalEmploymentGenerated
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="font-semibold">
-                                Direct Employment (Men)
-                              </p>
-                              <p>
-                                {formatMetricValue(
-                                  "totalProjects",
-                                  drilledAreaDetails.pmmsyMetrics
-                                    .directEmploymentMen
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="font-semibold">
-                                Direct Employment (Women)
-                              </p>
-                              <p>
-                                {formatMetricValue(
-                                  "totalProjects",
-                                  drilledAreaDetails.pmmsyMetrics
-                                    .directEmploymentWomen
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="font-semibold">
-                                Indirect Employment (Men)
-                              </p>
-                              <p>
-                                {formatMetricValue(
-                                  "totalProjects",
-                                  drilledAreaDetails.pmmsyMetrics
-                                    .indirectEmploymentMen
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="font-semibold">
-                                Indirect Employment (Women)
-                              </p>
-                              <p>
-                                {formatMetricValue(
-                                  "totalProjects",
-                                  drilledAreaDetails.pmmsyMetrics
-                                    .indirectEmploymentWomen
-                                )}
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <p className="font-semibold">
-                                Total Funds Allocated
-                              </p>
-                              <p>
-                                {formatMetricValue(
-                                  "funds",
-                                  drilledAreaDetails.metrics.funds
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="font-semibold">Funds Utilized</p>
-                              <p>
-                                {formatMetricValue(
-                                  "funds_used",
-                                  drilledAreaDetails.metrics.funds_used
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="font-semibold">
-                                Total Beneficiaries
-                              </p>
-                              <p>
-                                {formatMetricValue(
-                                  "beneficiaries",
-                                  drilledAreaDetails.metrics.beneficiaries
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="font-semibold">
-                                New Beneficiaries (Last 24h)
-                              </p>
-                              <p>
-                                {formatMetricValue(
-                                  "beneficiaries_last_24h",
-                                  drilledAreaDetails.metrics
-                                    .beneficiaries_last_24h
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="font-semibold">
-                                Total Registrations
-                              </p>
-                              <p>
-                                {formatMetricValue(
-                                  "registrations",
-                                  drilledAreaDetails.metrics.registrations
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="font-semibold">
-                                New Registrations (Last 24h)
-                              </p>
-                              <p>
-                                {formatMetricValue(
-                                  "registrations_last_24h",
-                                  drilledAreaDetails.metrics
-                                    .registrations_last_24h
-                                )}
-                              </p>
-                            </div>
+                        {/* Right side: Bihar Map if Bihar selected */}
+                        {selectedState === "Bihār" && biharGeoJson && (
+                          <div className="flex-1 bg-white shadow rounded-lg">
+                            <OpenLayersMap
+                              geoJsonData={
+                                selectedState === "Bihār" && biharGeoJson
+                                  ? biharGeoJson
+                                  : filteredGeoJsonData
+                              }
+                              metricData={metricData}
+                              selectedMetric={selectedMetric}
+                              demographicKey={demographicKey}
+                              getColor={getColor}
+                              formatMetricValue={formatMetricValue}
+                              getFullMetricName={getFullMetricName}
+                              officerNames={officerNames}
+                              onAreaClick={handleAreaClick}
+                              onDrillDown={handleDrillDown}
+                              mapView={
+                                selectedState === "Bihār" ? "district" : mapView
+                              }
+                              isDrilledDown={!!selectedState}
+                              center={[85.5, 25.5]} // longitude, latitude (center of Bihar)
+                              zoom={12}
+                            />
                           </div>
                         )}
+                      </div>
+                    )}
+                    {selectedState === "Bihār" && biharGeoJson && (
+                      <div>
+                        <BiharFullTable
+                          biharGeoJson={biharGeoJson}
+                          metricData={metricData}
+                          demographicKey={demographicKey}
+                          formatMetricValue={formatMetricValue}
+                        />
                       </div>
                     )}
                   </div>
