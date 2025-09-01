@@ -17,6 +17,8 @@ import {
   DistributionPieChart,
   TopAreasBarChart,
   EmploymentBarChart,
+  ProductionSaleChart,
+  CentralShareChart,
 } from "./components/Charts";
 
 // Interface for metric values
@@ -30,6 +32,12 @@ interface MetricValues {
   funds_used?: number;
   beneficiaries_last_24h?: number;
   registrations_last_24h?: number;
+
+  // 👇 New fields
+  production?: number; // MT/Year
+  fishSale?: number; // MT/Year
+  centralShareAllocated?: number;
+  centralShareReleased?: number;
 }
 
 // Type definitions for scheme, gender, year, and PMMSY metric filters
@@ -351,11 +359,23 @@ const App: React.FC = () => {
                 weight * (50000 + Math.random() * 450000)
               );
               const fishOutput = Math.floor(weight * (5 + Math.random() * 1));
+              const fishSale = Math.floor(
+                fishOutput * (0.3 + Math.random() * 0.1)
+              );
+              const centralShareAllocated = Math.floor(
+                totalInvestment * (0.6 + Math.random() * 0.2) // 60–80% of investment
+              );
+              const centralShareReleased = Math.floor(
+                centralShareAllocated * (0.7 + Math.random() * 0.2) // 70–90% of allocated
+              );
 
               areaData[key] = {
                 totalProjects,
                 totalInvestment,
                 fishOutput,
+                fishSale,
+                centralShareAllocated,
+                centralShareReleased,
               };
 
               // Update aggregated data
@@ -363,6 +383,15 @@ const App: React.FC = () => {
               aggregated["PMMSY_all_all_all"].totalInvestment! +=
                 totalInvestment;
               aggregated["PMMSY_all_all_all"].fishOutput! += fishOutput;
+              aggregated["PMMSY_all_all_all"].fishSale =
+                (aggregated["PMMSY_all_all_all"].fishSale || 0) + fishSale;
+              aggregated["PMMSY_all_all_all"].centralShareAllocated =
+                (aggregated["PMMSY_all_all_all"].centralShareAllocated || 0) +
+                centralShareAllocated;
+
+              aggregated["PMMSY_all_all_all"].centralShareReleased =
+                (aggregated["PMMSY_all_all_all"].centralShareReleased || 0) +
+                centralShareReleased;
 
               // Add aggregations for specific filters
               const genderKey = `PMMSY_${gender}_all_all`;
@@ -1955,11 +1984,11 @@ const App: React.FC = () => {
                         </div>
 
                         {/* Right side: Bihar Map if Bihar selected */}
-                        {selectedState === "Bihār" && biharGeoJson && (
+                        {selectedState === "Bihar" && biharGeoJson && (
                           <div className="flex-1 bg-white shadow rounded-lg">
                             <OpenLayersMap
                               geoJsonData={
-                                selectedState === "Bihār" && biharGeoJson
+                                selectedState === "Bihar" && biharGeoJson
                                   ? biharGeoJson
                                   : filteredGeoJsonData
                               }
@@ -1973,7 +2002,7 @@ const App: React.FC = () => {
                               onAreaClick={handleAreaClick}
                               onDrillDown={handleDrillDown}
                               mapView={
-                                selectedState === "Bihār" ? "district" : mapView
+                                selectedState === "Bihar" ? "district" : mapView
                               }
                               isDrilledDown={!!selectedState}
                               center={[85.5, 25.5]} // longitude, latitude (center of Bihar)
@@ -1983,7 +2012,7 @@ const App: React.FC = () => {
                         )}
                       </div>
                     )}
-                    {selectedState === "Bihār" && biharGeoJson && (
+                    {selectedState === "Bihar" && biharGeoJson && (
                       <div>
                         <BiharFullTable
                           biharGeoJson={biharGeoJson}
@@ -2042,12 +2071,31 @@ const App: React.FC = () => {
                   <>
                     <div className="flex flex-row gap-2">
                       <div className="flex-1">
-                        <SectorDistributionPieChart
-                          sectorDistribution={
-                            globalPMMSYMetrics.sectorDistribution
-                          }
-                          getColor={getColor}
-                        />
+                        {selectedScheme === "PMMSY" &&
+                        selectedState === "Bihar" ? (
+                          (console.log(
+                            "Rendering ProductionSaleChart with:",
+                            drilledAreaDetails
+                          ),
+                          (
+                            <ProductionSaleChart
+                              production={
+                                drilledAreaDetails?.pmmsyMetrics?.fishOutput ||
+                                300
+                              }
+                              fishSale={
+                                drilledAreaDetails?.metrics?.fishSale || 0
+                              }
+                            />
+                          ))
+                        ) : (
+                          <SectorDistributionPieChart
+                            sectorDistribution={
+                              globalPMMSYMetrics.sectorDistribution
+                            }
+                            getColor={getColor}
+                          />
+                        )}
                       </div>
                       <div className="flex-1">
                         <EmploymentBarChart
@@ -2065,18 +2113,33 @@ const App: React.FC = () => {
                         />
                       </div>
                     </div>
-                    <TopAreasBarChart
-                      barChartData={pmmsyBarData.data}
-                      barChartKeys={pmmsyBarData.keys}
-                      barChartDisplayNamesMap={pmmsyBarData.displayNamesMap}
-                      selectedMetric={selectedMetric}
-                      getColor={getColor}
-                      formatMetricValue={formatMetricValue}
-                      mapView={mapView}
-                      selectedBarChartCategory={selectedBarChartCategory}
-                      setSelectedBarChartCategory={setSelectedBarChartCategory}
-                      selectedScheme={selectedScheme}
-                    />
+                    {selectedScheme === "PMMSY" && selectedState === "Bihar" ? (
+                      <CentralShareChart
+                        allocated={
+                          drilledAreaDetails?.metrics
+                            ?.centralShareAllocated || 0
+                        }
+                        released={
+                          drilledAreaDetails?.metrics
+                            ?.centralShareReleased || 0
+                        }
+                      />
+                    ) : (
+                      <TopAreasBarChart
+                        barChartData={pmmsyBarData.data}
+                        barChartKeys={pmmsyBarData.keys}
+                        barChartDisplayNamesMap={pmmsyBarData.displayNamesMap}
+                        selectedMetric={selectedMetric}
+                        getColor={getColor}
+                        formatMetricValue={formatMetricValue}
+                        mapView={mapView}
+                        selectedBarChartCategory={selectedBarChartCategory}
+                        setSelectedBarChartCategory={
+                          setSelectedBarChartCategory
+                        }
+                        selectedScheme={selectedScheme}
+                      />
+                    )}
                   </>
                 ) : (
                   <>

@@ -259,3 +259,77 @@ export const TopAreasBarChart: React.FC<TopAreasBarChartProps> = ({
   );
 
 };
+
+// Production vs Fish Sale Chart
+interface ProductionSaleChartProps {
+  production: number;
+  fishSale: number;
+}
+
+export const ProductionSaleChart: React.FC<ProductionSaleChartProps> = ({
+  production,
+  fishSale,
+}) => {
+  const data = [
+    { name: "Production (MT/Year)", value: production },
+    { name: "Fish Sale (MT/Year)", value: fishSale },
+  ];
+
+  return (
+    <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-2">
+      <h3 className="text-lg font-semibold text-gray-900 pl-4">
+        Production & Fish Sale
+      </h3>
+      <ResponsiveContainer width="100%" height={250}>
+        <BarChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+          <YAxis />
+          <Tooltip />
+          <Bar dataKey="value" fill="#10b981">
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={index === 0 ? "#3b82f6" : "#f97316"} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
+interface CentralShareChartProps {
+  allocated: number;
+  released: number;
+}
+
+export const CentralShareChart: React.FC<CentralShareChartProps> = ({
+  allocated,
+  released,
+}) => {
+  const data = [
+    { name: "Central Share Allocated", value: allocated },
+    { name: "Central Share Released", value: released },
+  ];
+
+  return (
+    <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-4">
+      <h3 className="text-lg font-semibold text-gray-900 pl-4">
+        Central Share (Allocated vs Released)
+      </h3>
+      <ResponsiveContainer width="100%" height={250}>
+        <BarChart data={data}>
+          <XAxis dataKey="name" />
+          <YAxis />
+          <Tooltip />
+          <Bar dataKey="value" fill="#2563eb">
+            {data.map((entry, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={index === 0 ? "#3b82f6" : "#10b981"}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
