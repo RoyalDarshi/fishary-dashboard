@@ -19,12 +19,24 @@ const BiharFullTable: React.FC<BiharFullTableProps> = ({
     const distName = f.properties.shapeName;
     const distMetrics = metricData[distId]?.[demographicKey] || {};
 
-    return { id: distId, name: distName, ...distMetrics };
+    return {
+      id: distId,
+      name: distName,
+      projectName: f.properties.projectName || "N/A",
+      startDate: f.properties.startDate || "N/A",
+      endDate: f.properties.endDate || "N/A",
+      ...distMetrics,
+    };
   });
 
   // Extract all metric keys available
   const metricKeys = Object.keys(rows[0] || {}).filter(
-    (k) => k !== "id" && k !== "name"
+    (k) =>
+      k !== "id" &&
+      k !== "name" &&
+      k !== "projectName" &&
+      k !== "startDate" &&
+      k !== "endDate"
   );
 
   return (
@@ -33,6 +45,9 @@ const BiharFullTable: React.FC<BiharFullTableProps> = ({
         <thead className="bg-gray-100">
           <tr>
             <th className="px-3 py-2 border">District</th>
+            <th className="px-3 py-2 border">Project Name</th>
+            <th className="px-3 py-2 border">Start Date</th>
+            <th className="px-3 py-2 border">End Date</th>
             {metricKeys.map((key) => (
               <th key={key} className="px-3 py-2 border text-right">
                 {key}
@@ -44,6 +59,9 @@ const BiharFullTable: React.FC<BiharFullTableProps> = ({
           {rows.map((row) => (
             <tr key={row.id} className="hover:bg-gray-50">
               <td className="px-3 py-2 border font-medium">{row.name}</td>
+              <td className="px-3 py-2 border">{row.projectName}</td>
+              <td className="px-3 py-2 border">{row.startDate}</td>
+              <td className="px-3 py-2 border">{row.endDate}</td>
               {metricKeys.map((key) => (
                 <td key={key} className="px-3 py-2 border text-right">
                   {typeof row[key] === "number"
@@ -58,4 +76,5 @@ const BiharFullTable: React.FC<BiharFullTableProps> = ({
     </div>
   );
 };
+
 export default BiharFullTable;

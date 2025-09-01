@@ -195,6 +195,35 @@ const App: React.FC = () => {
     return officerMap;
   }, [polygonData]);
 
+  const projectPool = [
+    {
+      name: "Fish Seed Hatchery Development",
+      start: "2023-04-01",
+      end: "2025-03-31",
+    },
+    {
+      name: "Cold Storage & Ice Plant",
+      start: "2022-07-01",
+      end: "2024-06-30",
+    },
+    {
+      name: "Fish Market Modernization",
+      start: "2023-01-15",
+      end: "2025-12-31",
+    },
+    { name: "Aquaculture Expansion", start: "2023-09-01", end: "2026-08-31" },
+    {
+      name: "Inland Fisheries Infrastructure",
+      start: "2022-10-01",
+      end: "2024-09-30",
+    },
+    {
+      name: "Fishermen Training & Capacity Building",
+      start: "2023-05-01",
+      end: "2025-04-30",
+    },
+  ];
+
   // Generate mock data for schemes other than PMMSY
   const generateMockData = (
     areas: GeoJSONFeature[]
@@ -507,17 +536,25 @@ const App: React.FC = () => {
       .then((data) => {
         const normalized = {
           ...data,
-          features: data.features.map((f: any, idx: number) => ({
-            ...f,
-            properties: {
-              ...f.properties,
-              shapeID: f.properties.Dist_Code?.toString() || `bihar_${idx}`,
-              shapeName: f.properties.Dist_Name,
-              st_nm: f.properties.State_Name || "Bihar",
-              district_name: f.properties.Dist_Name,
-              level: "district",
-            },
-          })),
+          features: data.features.map((f: any, idx: number) => {
+            const distName = f.properties.Dist_Name;
+            const project = projectPool[idx % projectPool.length]; // cycle projects
+
+            return {
+              ...f,
+              properties: {
+                ...f.properties,
+                shapeID: f.properties.Dist_Code?.toString() || `bihar_${idx}`,
+                shapeName: distName,
+                st_nm: f.properties.State_Name || "Bihar",
+                district_name: distName,
+                level: "district",
+                projectName: project.name,
+                startDate: project.start,
+                endDate: project.end,
+              },
+            };
+          }),
         };
 
         setBiharGeoJson(normalized);
