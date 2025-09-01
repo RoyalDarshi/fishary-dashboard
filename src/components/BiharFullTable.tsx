@@ -25,6 +25,12 @@ const BiharFullTable: React.FC<BiharFullTableProps> = ({
       projectName: f.properties.projectName || "N/A",
       startDate: f.properties.startDate || "N/A",
       endDate: f.properties.endDate || "N/A",
+      activityName: f.properties.activityName || "N/A",
+      subActivityName: f.properties.subActivityName || "N/A",
+      beneficiaryType: f.properties.beneficiaryType || "N/A",
+      centralShare: f.properties.centralShare || 0,
+      stateShare: f.properties.stateShare || 0,
+      beneficiaryShare: f.properties.beneficiaryShare || 0,
       ...distMetrics,
     };
   });
@@ -36,7 +42,13 @@ const BiharFullTable: React.FC<BiharFullTableProps> = ({
       k !== "name" &&
       k !== "projectName" &&
       k !== "startDate" &&
-      k !== "endDate"
+      k !== "endDate" &&
+      k !== "activityName" && // ✅ new
+      k !== "subActivityName" && // ✅ new
+      k !== "beneficiaryType" && // ✅ new
+      k !== "centralShare" && // ✅ new
+      k !== "stateShare" && // ✅ new
+      k !== "beneficiaryShare" // ✅ new
   );
 
   return (
@@ -45,9 +57,16 @@ const BiharFullTable: React.FC<BiharFullTableProps> = ({
         <thead className="bg-gray-100">
           <tr>
             <th className="px-3 py-2 border">District</th>
-            <th className="px-3 py-2 border">Project Name</th>
-            <th className="px-3 py-2 border">Start Date</th>
-            <th className="px-3 py-2 border">End Date</th>
+            <th className="px-3 py-2 border">Name of the Activity</th>
+            <th className="px-3 py-2 border">Name of the Sub-Activity</th>
+            <th className="px-3 py-2 border">Date of Commencement of Work</th>
+            <th className="px-3 py-2 border">
+              Expected Date of Project Completion
+            </th>
+            <th className="px-3 py-2 border">Type of Beneficiary</th>
+            <th className="px-3 py-2 border text-right">Central Share</th>
+            <th className="px-3 py-2 border text-right">State Share</th>
+            <th className="px-3 py-2 border text-right">Beneficiary Share</th>
             {metricKeys.map((key) => (
               <th key={key} className="px-3 py-2 border text-right">
                 {key}
@@ -59,9 +78,20 @@ const BiharFullTable: React.FC<BiharFullTableProps> = ({
           {rows.map((row) => (
             <tr key={row.id} className="hover:bg-gray-50">
               <td className="px-3 py-2 border font-medium">{row.name}</td>
-              <td className="px-3 py-2 border">{row.projectName}</td>
+              <td className="px-3 py-2 border">{row.activityName}</td>
+              <td className="px-3 py-2 border">{row.subActivityName}</td>
               <td className="px-3 py-2 border">{row.startDate}</td>
               <td className="px-3 py-2 border">{row.endDate}</td>
+              <td className="px-3 py-2 border">{row.beneficiaryType}</td>
+              <td className="px-3 py-2 border text-right">
+                {formatMetricValue("funds", row.centralShare)}
+              </td>
+              <td className="px-3 py-2 border text-right">
+                {formatMetricValue("funds", row.stateShare)}
+              </td>
+              <td className="px-3 py-2 border text-right">
+                {formatMetricValue("funds", row.beneficiaryShare)}
+              </td>
               {metricKeys.map((key) => (
                 <td key={key} className="px-3 py-2 border text-right">
                   {typeof row[key] === "number"

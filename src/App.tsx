@@ -203,6 +203,31 @@ const App: React.FC = () => {
     return officerMap;
   }, [polygonData]);
 
+  const activityPool = [
+    "Enhancement of Production and Productivity",
+    "Infrastructure and Post-harvest Management",
+    "Fisheries Management and Regulatory Framework",
+  ];
+
+  const subActivityPool = [
+    "Construction of New Ponds (NE & Himalayan States/UTs)",
+    "Inputs for fresh water Aquaculture including Composite fish culture, Pangasius, Tilapia etc.",
+    "Input support for Integrated fish farming (livestock cum fish cultivation)",
+    "Construction of Raceways of minimum of 50 cubic meter",
+    "Input support for Integrated fish farming (paddy cum fish cultivation)",
+    "Establishment of New Freshwater Finfish Hatcheries",
+    "Ice Plant of minimum 10-ton capacity",
+    "Three wheeler with Ice Box including e-rickshaws for fish vending",
+    "Construction of kiosks of aquarium/ornamental fish",
+  ];
+
+  const beneficiaryTypes = [
+    "Fish farmers",
+    "Fishers",
+    "Fish vendors",
+    "Entrepreneur",
+  ];
+
   const projectPool = [
     {
       name: "Fish Seed Hatchery Development",
@@ -567,7 +592,13 @@ const App: React.FC = () => {
           ...data,
           features: data.features.map((f: any, idx: number) => {
             const distName = f.properties.Dist_Name;
-            const project = projectPool[idx % projectPool.length]; // cycle projects
+            const project = projectPool[idx % projectPool.length];
+            const activity = activityPool[idx % activityPool.length];
+            const subActivity = subActivityPool[idx % subActivityPool.length];
+            const totalCost = 1000000 + Math.floor(Math.random() * 5000000); // 10–60 L
+            const centralShare = Math.floor(totalCost * 0.6);
+            const stateShare = Math.floor(totalCost * 0.25);
+            const beneficiaryShare = totalCost - centralShare - stateShare;
 
             return {
               ...f,
@@ -581,6 +612,12 @@ const App: React.FC = () => {
                 projectName: project.name,
                 startDate: project.start,
                 endDate: project.end,
+                activityName: activity, // ✅ new
+                subActivityName: subActivity, // ✅ new
+                beneficiaryTypes,
+                centralShare,
+                stateShare,
+                beneficiaryShare,
               },
             };
           }),
