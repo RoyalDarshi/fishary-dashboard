@@ -5,7 +5,6 @@ import {
   IndianRupee,
   TrendingUp,
   Fish,
-  ArrowLeft,
   Undo2,
 } from "lucide-react";
 import OpenLayersMap from "./components/OpenLayerMap";
@@ -381,7 +380,7 @@ const App: React.FC = () => {
                 weight * (3 + Math.random() * 1)
               );
               const totalInvestment = Math.floor(
-                weight * (50000 + Math.random() * 450000)
+                weight * (1000000 + Math.random() * 9000000)
               );
               const fishOutput = Math.floor(weight * (5 + Math.random() * 1));
               const fishSale = Math.floor(
@@ -959,9 +958,9 @@ const App: React.FC = () => {
       if (typeof value === "number" && value >= 30) return "#a78bfa";
       return "#c4b5fd";
     } else if (metric === "totalInvestment") {
-      if (typeof value === "number" && value >= 4000000) return "#059669";
-      if (typeof value === "number" && value >= 2500000) return "#10b981";
-      if (typeof value === "number" && value >= 1000000) return "#34d399";
+      if (typeof value === "number" && value >= 200000000) return "#059669";
+      if (typeof value === "number" && value >= 150000000) return "#10b981";
+      if (typeof value === "number" && value >= 100000000) return "#34d399";
       return "#6ee7b7";
     } else if (metric === "fishOutput") {
       if (typeof value === "number" && value >= 150) return "#f97316";
@@ -1059,11 +1058,12 @@ const App: React.FC = () => {
       { min: 0, max: 30, label: "0-30", color: "#c4b5fd" },
     ],
     totalInvestment: [
-      { min: 4000000, max: Infinity, label: "40L+", color: "#059669" },
-      { min: 2500000, max: 4000000, label: "25L-40L", color: "#10b981" },
-      { min: 1000000, max: 2500000, label: "10L-25L", color: "#34d399" },
-      { min: 0, max: 1000000, label: "0-10L", color: "#6ee7b7" },
+      { min: 200000000, max: Infinity, label: "20Cr+", color: "#059669" },
+      { min: 150000000, max: 200000000, label: "15Cr-20Cr", color: "#10b981" },
+      { min: 100000000, max: 150000000, label: "10Cr-15Cr", color: "#34d399" },
+      { min: 50000000, max: 100000000, label: "5Cr-10Cr", color: "#6ee7b7" },
     ],
+
     fishOutput: [
       { min: 150, max: Infinity, label: "150+", color: "#f97316" },
       { min: 100, max: 150, label: "100-150", color: "#fb923c" },
@@ -1691,10 +1691,7 @@ const App: React.FC = () => {
                     ) : (
                       <>
                         <p className="text-2xl font-bold text-white mt-2">
-                          {formatMetricValue(
-                            "funds",
-                            schemeTotals[scheme] / 10
-                          )}
+                          {formatMetricValue("funds", schemeTotals[scheme])}
                         </p>
                         <p className="text-sm text-white/80 mt-1">
                           Total Funds Allocated
@@ -2153,12 +2150,11 @@ const App: React.FC = () => {
                     {selectedScheme === "PMMSY" && selectedState === "Bihar" ? (
                       <CentralShareChart
                         allocated={
-                          drilledAreaDetails?.metrics
-                            ?.centralShareAllocated || 0
+                          drilledAreaDetails?.metrics?.centralShareAllocated ||
+                          0
                         }
                         released={
-                          drilledAreaDetails?.metrics
-                            ?.centralShareReleased || 0
+                          drilledAreaDetails?.metrics?.centralShareReleased || 0
                         }
                       />
                     ) : (

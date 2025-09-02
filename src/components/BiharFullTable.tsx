@@ -27,7 +27,7 @@ const BiharFullTable: React.FC<BiharFullTableProps> = ({
       endDate: f.properties.endDate || "N/A",
       activityName: f.properties.activityName || "N/A",
       subActivityName: f.properties.subActivityName || "N/A",
-      beneficiaryType: f.properties.beneficiaryType || "N/A",
+      beneficiaryType: f.properties.beneficiaryTypes || "N/A",
       centralShare: f.properties.centralShare || 0,
       stateShare: f.properties.stateShare || 0,
       beneficiaryShare: f.properties.beneficiaryShare || 0,
@@ -75,32 +75,39 @@ const BiharFullTable: React.FC<BiharFullTableProps> = ({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="hover:bg-gray-50">
-              <td className="px-3 py-2 border font-medium">{row.name}</td>
-              <td className="px-3 py-2 border">{row.activityName}</td>
-              <td className="px-3 py-2 border">{row.subActivityName}</td>
-              <td className="px-3 py-2 border">{row.startDate}</td>
-              <td className="px-3 py-2 border">{row.endDate}</td>
-              <td className="px-3 py-2 border">{row.beneficiaryType}</td>
-              <td className="px-3 py-2 border text-right">
-                {formatMetricValue("funds", row.centralShare)}
-              </td>
-              <td className="px-3 py-2 border text-right">
-                {formatMetricValue("funds", row.stateShare)}
-              </td>
-              <td className="px-3 py-2 border text-right">
-                {formatMetricValue("funds", row.beneficiaryShare)}
-              </td>
-              {metricKeys.map((key) => (
-                <td key={key} className="px-3 py-2 border text-right">
-                  {typeof row[key] === "number"
-                    ? formatMetricValue(key, row[key])
-                    : row[key] || "-"}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {rows.map(
+            (row) => (
+              console.log(row),
+              (
+                <tr key={row.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 border font-medium">{row.name}</td>
+                  <td className="px-3 py-2 border">{row.activityName}</td>
+                  <td className="px-3 py-2 border">{row.subActivityName}</td>
+                  <td className="px-3 py-2 border">{row.startDate}</td>
+                  <td className="px-3 py-2 border">{row.endDate}</td>
+                  <td className="px-3 py-2 border">
+                    {row.beneficiaryType[row.id % row.beneficiaryType.length]}
+                  </td>
+                  <td className="px-3 py-2 border text-right">
+                    {formatMetricValue("funds", row.centralShare)}
+                  </td>
+                  <td className="px-3 py-2 border text-right">
+                    {formatMetricValue("funds", row.stateShare)}
+                  </td>
+                  <td className="px-3 py-2 border text-right">
+                    {formatMetricValue("funds", row.beneficiaryShare)}
+                  </td>
+                  {metricKeys.map((key) => (
+                    <td key={key} className="px-3 py-2 border text-right">
+                      {typeof row[key] === "number"
+                        ? formatMetricValue(key, row[key])
+                        : row[key] || "-"}
+                    </td>
+                  ))}
+                </tr>
+              )
+            )
+          )}
         </tbody>
       </table>
     </div>
