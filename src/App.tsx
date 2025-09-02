@@ -18,6 +18,7 @@ import {
   EmploymentBarChart,
   ProductionSaleChart,
   CentralShareChart,
+  SharePieChart,
 } from "./components/Charts";
 
 // Interface for metric values
@@ -37,6 +38,8 @@ interface MetricValues {
   fishSale?: number; // MT/Year
   centralShareAllocated?: number;
   centralShareReleased?: number;
+  stateShare?: number;
+  beneficiaryShare?: number;
 }
 
 // Type definitions for scheme, gender, year, and PMMSY metric filters
@@ -392,6 +395,9 @@ const App: React.FC = () => {
               const centralShareReleased = Math.floor(
                 centralShareAllocated * (0.7 + Math.random() * 0.2) // 70–90% of allocated
               );
+              const remainingShare = totalInvestment - centralShareAllocated;
+              const stateShare = Math.floor(remainingShare * 0.6); // 60% of rest
+              const beneficiaryShare = remainingShare - stateShare; // 40% of rest
 
               areaData[key] = {
                 totalProjects,
@@ -400,6 +406,8 @@ const App: React.FC = () => {
                 fishSale,
                 centralShareAllocated,
                 centralShareReleased,
+                stateShare,
+                beneficiaryShare,
               };
 
               // Update aggregated data
@@ -416,6 +424,12 @@ const App: React.FC = () => {
               aggregated["PMMSY_all_all_all"].centralShareReleased =
                 (aggregated["PMMSY_all_all_all"].centralShareReleased || 0) +
                 centralShareReleased;
+              aggregated["PMMSY_all_all_all"].stateShare =
+                (aggregated["PMMSY_all_all_all"].stateShare || 0) + stateShare;
+
+              aggregated["PMMSY_all_all_all"].beneficiaryShare =
+                (aggregated["PMMSY_all_all_all"].beneficiaryShare || 0) +
+                beneficiaryShare;
 
               // Add aggregations for specific filters
               const genderKey = `PMMSY_${gender}_all_all`;
@@ -2170,15 +2184,32 @@ const App: React.FC = () => {
                       </div>
                     </div>
                     {selectedScheme === "PMMSY" && selectedState === "Bihar" ? (
-                      <CentralShareChart
-                        allocated={
-                          drilledAreaDetails?.metrics?.centralShareAllocated ||
-                          0
-                        }
-                        released={
-                          drilledAreaDetails?.metrics?.centralShareReleased || 0
-                        }
-                      />
+                      <div className="flex flex-row gap-2">
+                        <div className="flex-1">
+                          <CentralShareChart
+                            allocated={
+                              drilledAreaDetails?.metrics
+                                ?.centralShareAllocated || 0
+                            }
+                            released={
+                              drilledAreaDetails?.metrics
+                                ?.centralShareReleased || 0
+                            }
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <SharePieChart
+                            central={
+                              drilledAreaDetails?.metrics
+                                ?.centralShareAllocated || 0
+                            }
+                            state={drilledAreaDetails?.metrics?.stateShare || 0}
+                            beneficiary={
+                              drilledAreaDetails?.metrics?.beneficiaryShare || 0
+                            }
+                          />
+                        </div>
+                      </div>
                     ) : (
                       <TopAreasBarChart
                         barChartData={pmmsyBarData.data}
