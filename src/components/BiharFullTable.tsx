@@ -43,12 +43,18 @@ const BiharFullTable: React.FC<BiharFullTableProps> = ({
       k !== "projectName" &&
       k !== "startDate" &&
       k !== "endDate" &&
-      k !== "activityName" && // ✅ new
-      k !== "subActivityName" && // ✅ new
-      k !== "beneficiaryType" && // ✅ new
-      k !== "centralShare" && // ✅ new
-      k !== "stateShare" && // ✅ new
-      k !== "beneficiaryShare" // ✅ new
+      k !== "activityName" &&
+      k !== "subActivityName" &&
+      k !== "beneficiaryType" &&
+      k !== "centralShare" &&
+      k !== "stateShare" &&
+      k !== "beneficiaryShare" &&
+      k !== "totalProjects" &&
+      k !== "totalInvestment" &&
+      k !== "fishOutput" &&
+      k !== "fishSale" &&
+      k !== "centralShareAllocated" &&
+      k !== "centralShareReleased"
   );
 
   return (
@@ -67,6 +73,16 @@ const BiharFullTable: React.FC<BiharFullTableProps> = ({
             <th className="px-3 py-2 border text-right">Central Share</th>
             <th className="px-3 py-2 border text-right">State Share</th>
             <th className="px-3 py-2 border text-right">Beneficiary Share</th>
+            <th className="px-3 py-2 border text-right">Total Projects</th>
+            <th className="px-3 py-2 border text-right">Total Investment</th>
+            <th className="px-3 py-2 border text-right">Fish Output</th>
+            <th className="px-3 py-2 border text-right">Fish Sale</th>
+            <th className="px-3 py-2 border text-right">
+              Central Share Allocated
+            </th>
+            <th className="px-3 py-2 border text-right">
+              Central Share Released
+            </th>
             {metricKeys.map((key) => (
               <th key={key} className="px-3 py-2 border text-right">
                 {key}
@@ -96,6 +112,41 @@ const BiharFullTable: React.FC<BiharFullTableProps> = ({
                   </td>
                   <td className="px-3 py-2 border text-right">
                     {formatMetricValue("funds", row.beneficiaryShare)}
+                  </td>
+                  <td className="px-3 py-2 border text-right">
+                    {row.totalProjects || 0}
+                  </td>
+                  <td className="px-3 py-2 border text-right">
+                    {row.totalInvestment
+                      ? formatMetricValue(
+                          "totalInvestment",
+                          row.totalInvestment
+                        )
+                      : 0}
+                  </td>
+                  <td className="px-3 py-2 border text-right">
+                    {row.fishOutput
+                      ? formatMetricValue("fishOutput", row.fishOutput)
+                      : 0}
+                  </td>
+                  <td className="px-3 py-2 border text-right">
+                    {row.fishSale ? row.fishSale + " Tonnes" : 0}
+                  </td>
+                  <td className="px-3 py-2 border text-right">
+                    {row.centralShareAllocated
+                      ? formatMetricValue(
+                          "centralInvestment",
+                          row.centralShareAllocated
+                        )
+                      : 0}
+                  </td>
+                  <td className="px-3 py-2 border text-right">
+                    {row.centralShareReleased
+                      ? formatMetricValue(
+                          "centralInvestment",
+                          row.centralShareReleased
+                        )
+                      : 0}
                   </td>
                   {metricKeys.map((key) => (
                     <td key={key} className="px-3 py-2 border text-right">

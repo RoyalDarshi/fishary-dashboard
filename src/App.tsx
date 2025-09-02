@@ -1943,6 +1943,13 @@ const App: React.FC = () => {
                                   key: "totalInvestment",
                                 },
                                 {
+                                  label: "Central Investment",
+                                  value:
+                                    drilledAreaDetails.metrics
+                                      .centralShareAllocated,
+                                  key: "centralInvestment",
+                                },
+                                {
                                   label: "Fish Output",
                                   value:
                                     drilledAreaDetails.pmmsyMetrics.fishOutput,
