@@ -916,6 +916,28 @@ const App: React.FC = () => {
     mapView,
   ]);
 
+  const getBiharColor = (metric: string, value: number | string): string => {
+    if (metric === "totalProjects") {
+      if (typeof value === "number" && value >= 5) return "#6366f1"; // 10L+
+      if (typeof value === "number" && value >= 3) return "#8b5cf6"; // 5L-10L
+      if (typeof value === "number" && value >= 1) return "#a78bfa"; // 1L-5L
+      return "#c4b5fd"; // <1L
+    } else if (metric === "totalInvestment") {
+      if (typeof value === "number" && value >= 4000000) return "#059669"; // 20Cr+
+      if (typeof value === "number" && value >= 3000000) return "#10b981"; // 15-20Cr
+      if (typeof value === "number" && value >= 2000000) return "#34d399"; // 10-15Cr
+      if (typeof value === "number" && value >= 1000000) return "#6ee7b7"; // 5-10Cr
+      return "#a7f3d0"; // <5Cr
+    } else if (metric === "fishOutput") {
+      if (typeof value === "number" && value >= 5) return "#f97316"; // 20K MT+
+      if (typeof value === "number" && value >= 3) return "#fb923c"; // 10-20K MT
+      if (typeof value === "number" && value >= 1) return "#fdba74"; // 5-10K MT
+      return "#fed7aa"; // <5K MT
+    }
+
+    return "#6b7280"; // default grey
+  };
+
   // Color function for all metrics
   const getColor = (metric: string, value: number | string): string => {
     const categoryColors: Record<string, string> = {
@@ -2029,7 +2051,7 @@ const App: React.FC = () => {
                               metricData={metricData}
                               selectedMetric={selectedMetric}
                               demographicKey={demographicKey}
-                              getColor={getColor}
+                              getColor={getBiharColor}
                               formatMetricValue={formatMetricValue}
                               getFullMetricName={getFullMetricName}
                               officerNames={officerNames}
