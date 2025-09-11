@@ -125,6 +125,28 @@ const yearDisplayNames: Record<YearKey, string> = {
   2024: "2024",
 };
 
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+}
+
+class SeededPRNG {
+  private seed: number;
+  constructor(seed: number) {
+    this.seed = seed % 2147483647;
+    if (this.seed <= 0) this.seed += 2147483646;
+  }
+  next(): number {
+    this.seed = (this.seed * 16807) % 2147483647;
+    return (this.seed - 1) / 2147483646;
+  }
+}
+
 const App: React.FC = () => {
   // State variables
   const [polygonData, setPolygonData] = useState<GeoJSONData | null>(null);
@@ -291,11 +313,12 @@ const App: React.FC = () => {
 
     areas.forEach((area) => {
       const areaId = area.properties.shapeID;
+      const prng = new SeededPRNG(hashString(areaId));
       const areaData: AreaMetricData = {};
       const regionalBias =
         area.properties.level === "state"
-          ? 1.0 + Math.random() * 0.1
-          : 0.9 + Math.random() * 0.2;
+          ? 1.0 + prng.next() * 0.1
+          : 0.9 + prng.next() * 0.2;
 
       schemes.forEach((scheme) => {
         genders.forEach((gender) => {
@@ -307,21 +330,21 @@ const App: React.FC = () => {
             const weight = schemeMod * genderMod * yearMod * regionalBias;
 
             const beneficiaries = Math.floor(
-              weight * (500 + Math.random() * 4500)
+              weight * (500 + prng.next() * 4500)
             );
             const funds = Math.floor(
-              weight * (1000000 + Math.random() * 9000000)
+              weight * (1000000 + prng.next() * 9000000)
             );
             const registrations = Math.floor(
-              weight * (2000 + Math.random() * 8000)
+              weight * (2000 + prng.next() * 8000)
             );
 
-            const funds_used = Math.floor(funds * (0.6 + Math.random() * 0.35));
+            const funds_used = Math.floor(funds * (0.6 + prng.next() * 0.35));
             const beneficiaries_last_24h = Math.floor(
-              beneficiaries * (0.01 + Math.random() * 0.05)
+              beneficiaries * (0.01 + prng.next() * 0.05)
             );
             const registrations_last_24h = Math.floor(
-              registrations * (0.005 + Math.random() * 0.02)
+              registrations * (0.005 + prng.next() * 0.02)
             );
 
             areaData[key] = {
@@ -350,8 +373,9 @@ const App: React.FC = () => {
 
       areas.forEach((area) => {
         const areaId = area.properties.shapeID;
+        const prng = new SeededPRNG(hashString(areaId));
         const areaData: AreaMetricData = {};
-        const regionalBias = 0.1 + Math.random() * 1.9;
+        const regionalBias = 0.1 + prng.next() * 1.9;
 
         // Precompute aggregated data for common filter combinations
         const aggregated: Record<string, MetricValues> = {
@@ -379,25 +403,23 @@ const App: React.FC = () => {
               const sectorMod = sector === "Inland" ? 1.1 : 0.9;
               const weight = genderMod * yearMod * sectorMod * regionalBias;
 
-              const totalProjects = Math.floor(
-                weight * (3 + Math.random() * 1)
-              );
+              const totalProjects = Math.floor(weight * (3 + prng.next() * 1));
               const totalInvestment = Math.floor(
-                weight * (1000000 + Math.random() * 9000000)
+                weight * (1000000 + prng.next() * 9000000)
               );
-              const fishOutput = Math.floor(weight * (5 + Math.random() * 1));
+              const fishOutput = Math.floor(weight * (5 + prng.next() * 1));
               const fishSale = Math.floor(
-                fishOutput * (0.3 + Math.random() * 0.1)
+                fishOutput * (0.3 + prng.next() * 0.1)
               );
               const centralShareAllocated = Math.floor(
-                totalInvestment * (0.6 + Math.random() * 0.2) // 60–80% of investment
+                totalInvestment * (0.6 + prng.next() * 0.2)
               );
               const centralShareReleased = Math.floor(
-                centralShareAllocated * (0.7 + Math.random() * 0.2) // 70–90% of allocated
+                centralShareAllocated * (0.7 + prng.next() * 0.2)
               );
               const remainingShare = totalInvestment - centralShareAllocated;
-              const stateShare = Math.floor(remainingShare * 0.6); // 60% of rest
-              const beneficiaryShare = remainingShare - stateShare; // 40% of rest
+              const stateShare = Math.floor(remainingShare * 0.6);
+              const beneficiaryShare = remainingShare - stateShare;
 
               areaData[key] = {
                 totalProjects,
@@ -420,13 +442,11 @@ const App: React.FC = () => {
               aggregated["PMMSY_all_all_all"].centralShareAllocated =
                 (aggregated["PMMSY_all_all_all"].centralShareAllocated || 0) +
                 centralShareAllocated;
-
               aggregated["PMMSY_all_all_all"].centralShareReleased =
                 (aggregated["PMMSY_all_all_all"].centralShareReleased || 0) +
                 centralShareReleased;
               aggregated["PMMSY_all_all_all"].stateShare =
                 (aggregated["PMMSY_all_all_all"].stateShare || 0) + stateShare;
-
               aggregated["PMMSY_all_all_all"].beneficiaryShare =
                 (aggregated["PMMSY_all_all_all"].beneficiaryShare || 0) +
                 beneficiaryShare;
@@ -480,6 +500,15 @@ const App: React.FC = () => {
   );
 
   // Generate mock data for all schemes
+  // useEffect(() => {
+  //   if (polygonData && !mockNonPMMSYData && !mockPMMSYData) {
+  //     const nonPMMSYData = generateMockData(polygonData.features);
+  //     const pmmsyData = generateMockPMMSYData(polygonData.features);
+  //     setMockNonPMMSYData(nonPMMSYData);
+  //     setMockPMMSYData(pmmsyData);
+  //   }
+  // }, [polygonData, mockNonPMMSYData, mockPMMSYData, generateMockPMMSYData]);
+
   useEffect(() => {
     if (polygonData && !mockNonPMMSYData && !mockPMMSYData) {
       const nonPMMSYData = generateMockData(polygonData.features);
@@ -679,17 +708,17 @@ const App: React.FC = () => {
       Object.entries(metrics).forEach(([mKey, mVal]) => {
         if (typeof mVal !== "number") return;
 
-        // 1. Random weights for districts
-        const weights = districts.map(() => Math.random());
+        // Use "Bihar" as fixed prefix since state is always Bihar
+        const seed = hashString("Bihar_" + key + "_" + mKey);
+        const prng = new SeededPRNG(seed);
+
+        const weights = districts.map(() => prng.next());
         const totalWeight = weights.reduce((a, b) => a + b, 0);
-        const normalizedWeights = weights.map((w) => w / totalWeight);
+        const normalizedWeights = weights.map((w) => w / (totalWeight || 1));
 
-        // 2. Assign values with random distribution
         const tempValues = normalizedWeights.map((w) => mVal * w);
-
-        // 3. Rescale so sum matches Bihar state total
         const sumTemp = tempValues.reduce((a, b) => a + b, 0);
-        const scale = mVal / sumTemp;
+        const scale = sumTemp > 0 ? mVal / sumTemp : 0;
 
         districts.forEach((dist, idx) => {
           const distId = dist.properties.shapeID;
