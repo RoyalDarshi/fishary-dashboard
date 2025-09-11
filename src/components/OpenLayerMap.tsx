@@ -4,7 +4,8 @@ import { Map, View } from "ol";
 import { Vector as VectorSource } from "ol/source";
 import { Vector as VectorLayer } from "ol/layer";
 import { GeoJSON } from "ol/format";
-import { Style, Fill, Stroke } from "ol/style";
+import { Style, Fill, Stroke, Text } from "ol/style";
+import { getCenter } from "ol/extent";
 import { fromLonLat } from "ol/proj";
 import { Overlay } from "ol"; // Import Overlay for tooltip
 import { Zoom } from "ol/control";
@@ -401,6 +402,8 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
       const value = metricData?.[id]?.[demographicKey]?.[selectedMetric] || 0;
       const fillColor = getColor(selectedMetric, value);
 
+      const label = properties.Code_Name || "";
+
       if (mapView === "state") {
         if (level === "state") {
           return new Style({
@@ -411,6 +414,19 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
               color: "#17202a", // Default stroke for states
               width: 0.5,
             }),
+            text: new Text({
+              text: label,
+              font: "bold 13px 'Inter', sans-serif",
+              fill: new Fill({ color: "#1f2937" }), // dark gray text
+              stroke: new Stroke({ color: "#ffffff", width: 3 }), // strong white halo for contrast
+              overflow: true, // render even if text overflows
+              placement: "point", // place text inside polygon
+              textAlign: "center",
+            }),
+            // geometry: (feature) => {
+            //   // Force label to be placed only once at the center of the feature
+            //   return feature.getGeometry().getInteriorPoint();
+            // },
           });
         } else {
           // Hide non-state features in state view
@@ -427,6 +443,16 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
               color: "#fcf3cf", // District border color
               width: 0.7, // District border width
             }),
+            text: new Text({
+              text: label,
+              font: "bold 13px 'Inter', sans-serif",
+              fill: new Fill({ color: "#1f2937" }), // dark gray text
+              stroke: new Stroke({ color: "#ffffff", width: 3 }), // strong white halo for contrast
+              overflow: true, // render even if text overflows
+              placement: "point", // place text inside polygon
+              textAlign: "center",
+            }),
+
             zIndex: 1, // Districts below state borders
           });
         } else if (level === "state") {
@@ -439,6 +465,16 @@ const OpenLayersMap: React.FC<OpenLayersMapProps> = ({
               color: "#17202a", // Darker, prominent state border color
               width: 1, // Thicker state border width
             }),
+            // text: new Text({
+            //   text: label,
+            //   font: "bold 13px 'Inter', sans-serif",
+            //   fill: new Fill({ color: "#1f2937" }), // dark gray text
+            //   stroke: new Stroke({ color: "#ffffff", width: 3 }), // strong white halo for contrast
+            //   overflow: true, // render even if text overflows
+            //   placement: "point", // place text inside polygon
+            //   textAlign: "center",
+            // }),
+
             zIndex: 2, // State borders on top
           });
         }

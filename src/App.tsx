@@ -1721,7 +1721,7 @@ const App: React.FC = () => {
                           )}
                         </p>
                         <p className="text-sm text-white/80 mt-1">
-                          Total Investment
+                          Total Funds Allocated
                         </p>
                       </>
                     ) : (
